@@ -406,8 +406,7 @@ function generatePair() {
   lv.below.forEach(d => pool.push(100 - d));
   lv.above.forEach(d => pool.push(100 + d));
   const a = pool[Math.floor(Math.random() * pool.length)];
-  let b;
-  do { b = pool[Math.floor(Math.random() * pool.length)]; } while (b === a && pool.length > 1);
+  const b = pool[Math.floor(Math.random() * pool.length)];
   return [a, b];
 }
 
