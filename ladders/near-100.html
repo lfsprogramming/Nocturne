@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Near-100 Drill</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+#setup { gap: 20px; background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%); overflow-y: auto; }
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(0,245,255,0.4));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(0,245,255,0.3)); }
+  50%     { filter: drop-shadow(0 0 40px rgba(0,245,255,0.7)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 28px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 140px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.setting-val { font-size: 0.75rem; color: var(--accent); min-width: 40px; text-align: right; }
+
+.toggle-row { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; width: min(340px, 90vw); }
+.toggle-btn { flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 0; border: none; background: var(--surface); color: var(--muted); cursor: pointer; transition: background 0.15s, color 0.15s; }
+.toggle-btn.active { background: var(--accent); color: #000; font-weight: 700; }
+.toggle-btn:not(.active):hover { background: var(--border); color: var(--text); }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+#timer-bar-bg { width: 100%; height: 4px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: #534ab7; transition: width 0.3s ease; }
+
+#drill-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px; width: 100%; max-width: 500px; margin: 0 auto; }
+
+#range-badge { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+
+#question {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.5rem, 10vw, 5rem);
+  color: var(--text);
+  letter-spacing: 0.05em;
+  text-align: center;
+  line-height: 1.1;
+}
+
+#question .num { color: var(--accent); }
+#question .op { color: var(--muted); }
+
+#vedic-hint {
+  font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em;
+  text-align: center; min-height: 16px; line-height: 1.8;
+}
+
+#answer-input-wrap { display: flex; gap: 10px; align-items: center; }
+#answer-input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 1.8rem;
+  padding: 10px 16px; width: 160px; text-align: center; outline: none;
+  transition: border-color 0.15s;
+}
+#answer-input:focus { border-color: var(--accent); }
+#submit-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.15em;
+  padding: 10px 20px; border: 1px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 4px; transition: all 0.15s;
+}
+#submit-btn:hover { background: var(--accent); color: #000; }
+
+#feedback-area { text-align: center; min-height: 60px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#feedback-msg { font-size: 0.85rem; letter-spacing: 0.08em; min-height: 20px; }
+.fb-ok { color: var(--green); }
+.fb-err { color: var(--danger); }
+#method-reveal { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.08em; line-height: 1.8; text-align: center; min-height: 40px; }
+#method-reveal .step { color: var(--gold); }
+
+#progress-info { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+#clear { gap: 12px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label { font-size: 0.75rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+.clear-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  background: linear-gradient(135deg, var(--gold), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(255,215,0,0.5));
+  animation: clearpop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes clearpop { 0% { transform: scale(0.2) rotate(-5deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+.clear-msg { font-size: 0.8rem; color: var(--text); letter-spacing: 0.08em; max-width: 320px; line-height: 1.8; }
+.clear-next { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0% { transform: translateX(-8px); } 20% { transform: translateX(8px); } 40% { transform: translateX(-5px); } 60% { transform: translateX(5px); } 80% { transform: translateX(-2px); } 100% { transform: translateX(0); } }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0% { transform:scale(0); opacity:0; } 100% { transform:scale(1); opacity:1; } }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+.go-btn.csv { border-color: var(--green); color: var(--green); background: transparent; }
+.go-btn.csv:hover { background: var(--green); color: #000; }
+</style>
+</head>
+<body>
+
+<div id="setup" class="screen active">
+  <div class="logo">Near-100</div>
+  <div class="tagline">Vedic base method — multiply at speed</div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:min(340px,90vw)">
+    <div class="section-label">method hint</div>
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="hintOn" onclick="setHint(true)">show hint</button>
+      <button class="toggle-btn" id="hintOff" onclick="setHint(false)">hide hint</button>
+    </div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>starting time</label>
+      <input type="range" id="slTime" min="5" max="30" step="1" value="10">
+      <span class="setting-val" id="outTime">10s</span>
+    </div>
+    <div class="setting-row">
+      <label>time kept per level</label>
+      <input type="range" id="slDecay" min="70" max="99" step="1" value="95">
+      <span class="setting-val" id="outDecay">95%</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start climbing</button>
+</div>
+
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">10</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+    <div class="hud-stat"><div class="val" id="hudTime">10s</div><div class="lbl">Time</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="range-badge"></div>
+    <div id="question"></div>
+    <div id="vedic-hint"></div>
+    <div id="answer-input-wrap">
+      <input id="answer-input" type="number" placeholder="?" autocomplete="off">
+      <button id="submit-btn">↵</button>
+    </div>
+    <div id="feedback-area">
+      <div id="feedback-msg"></div>
+      <div id="method-reveal"></div>
+    </div>
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title" id="clearTitle">CLEARED!</div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ tap or press space to continue</div>
+</div>
+
+<div id="gameover" class="screen">
+  <div class="go-title">game over</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.7rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">▶ try again</button>
+    <button class="go-btn csv" id="csvBtn">↓ download log</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+const LEVELS = [
+  { name: "99–98",       below: [1,2],    above: [],      needed: 10 },
+  { name: "99–97",       below: [1,2,3],  above: [],      needed: 11 },
+  { name: "99–96",       below: [1,2,3,4],above: [],      needed: 12 },
+  { name: "99–94",       below: [1,2,3,4,5,6], above: [], needed: 13 },
+  { name: "99–92",       below: [1,2,3,4,5,6,7,8], above: [], needed: 14 },
+  { name: "99–90",       below: [1,2,3,4,5,6,7,8,9,10], above: [], needed: 15 },
+  { name: "99–88",       below: [1,2,3,4,5,6,7,8,9,10,11,12], above: [], needed: 16 },
+  { name: "88–99 & 101", below: [1,2,3,4,5,6,7,8,9,10,11,12], above: [1,2], needed: 17 },
+  { name: "88–99 & 103", below: [1,2,3,4,5,6,7,8,9,10,11,12], above: [1,2,3], needed: 18 },
+  { name: "88–99 & 104", below: [1,2,3,4,5,6,7,8,9,10,11,12], above: [1,2,3,4], needed: 19 },
+  { name: "88–99 & 105", below: [1,2,3,4,5,6,7,8,9,10,11,12], above: [1,2,3,4,5], needed: 20 },
+  { name: "full range",  below: [1,2,3,4,5,6,7,8,9,10,11,12], above: [1,2,3,4,5], needed: 20, timeDecay: true },
+];
+
+const CLEAR_MESSAGES = [
+  "98×99. The easiest case. Now it gets real.",
+  "Three deficits. Your carry instinct is forming.",
+  "Four down. You're building the pattern.",
+  "Six deficit range. Stay methodical.",
+  "Eight deficit range. Most people slow here.",
+  "Ten deficit range. Your mental workspace is expanding.",
+  "Full below-100 range. Solid.",
+  "First numbers above 100. Different direction, same method.",
+  "Mixed range. Your brain is generalising.",
+  "Getting close to the full range.",
+  "One step from mastery.",
+  "Full range. Now it's just speed.",
+  "Elite territory. Pure automaticity from here.",
+  "Legendary.",
+  "Maximum performance.",
+];
+
+function getClearMsg(lvl) { return CLEAR_MESSAGES[Math.min(lvl-1, CLEAR_MESSAGES.length-1)]; }
+
+let showHint = true;
+let startTime = 10;
+let decayRate = 0.95;
+let currentLevel = 0;
+let currentA, currentB;
+let levelDone = 0;
+let streak = 0;
+let sessionLog = [];
+let sessionStart = null;
+let timerInterval = null;
+let timerAnimFrame = null;
+let promptStart = 0;
+let totalTime = 10;
+let timeLeft = 10;
+let waitingForClear = false;
+let phase = 'idle';
+
+function setHint(v) {
+  showHint = v;
+  document.getElementById('hintOn').classList.toggle('active', v);
+  document.getElementById('hintOff').classList.toggle('active', !v);
+}
+
+document.getElementById('slTime').addEventListener('input', function() {
+  startTime = parseInt(this.value);
+  document.getElementById('outTime').textContent = this.value + 's';
+});
+document.getElementById('slDecay').addEventListener('input', function() {
+  decayRate = parseInt(this.value) / 100;
+  document.getElementById('outDecay').textContent = this.value + '%';
+});
+
+function getBestLevel() { return parseInt(localStorage.getItem('near100BestLevel') || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('near100BestStreak') || '0'); }
+function saveBestLevel(v) { localStorage.setItem('near100BestLevel', v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('near100BestStreak', v); refreshBest(); }
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+}
+refreshBest();
+
+function show(id) {
+  ['setup','drill','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function timeForLevel(lvl) {
+  const lv = LEVELS[lvl];
+  if (!lv.timeDecay) return startTime;
+  const decayLevels = lvl - 11;
+  return Math.max(3, startTime * Math.pow(decayRate, decayLevels));
+}
+
+function neededForLevel(lvl) {
+  return Math.min(50, LEVELS[lvl].needed);
+}
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => { clearTimers(); show('setup'); });
+document.getElementById('csvBtn').addEventListener('click', downloadCSV);
+document.getElementById('submit-btn').addEventListener('click', submitAnswer);
+document.getElementById('answer-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitAnswer(); });
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.getElementById('clear').addEventListener('touchend', e => { e.preventDefault(); proceedFromClear(); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.getElementById('clear').classList.contains('active')) {
+    e.preventDefault(); proceedFromClear();
+  }
+});
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  show('drill');
+  startLevel();
+}
+
+function startLevel() {
+  levelDone = 0;
+  totalTime = timeForLevel(currentLevel);
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudNeeded').textContent = neededForLevel(currentLevel);
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('range-badge').textContent = LEVELS[currentLevel].name;
+  updateProgressBar();
+  nextQuestion();
+}
+
+function generatePair() {
+  const lv = LEVELS[currentLevel];
+  const pool = [];
+  lv.below.forEach(d => pool.push(100 - d));
+  lv.above.forEach(d => pool.push(100 + d));
+  const a = pool[Math.floor(Math.random() * pool.length)];
+  let b;
+  do { b = pool[Math.floor(Math.random() * pool.length)]; } while (b === a && pool.length > 1);
+  return [a, b];
+}
+
+function nextQuestion() {
+  phase = 'question';
+  clearTimers();
+  [currentA, currentB] = generatePair();
+
+  document.getElementById('question').innerHTML =
+    `<span class="num">${currentA}</span> <span class="op">×</span> <span class="num">${currentB}</span>`;
+
+  if (showHint) {
+    const da = 100 - currentA, db = 100 - currentB;
+    const sign = (da <= 0 && db <= 0) ? '' : '';
+    document.getElementById('vedic-hint').textContent = buildHintText(currentA, currentB);
+  } else {
+    document.getElementById('vedic-hint').textContent = '';
+  }
+
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = '';
+  document.getElementById('method-reveal').textContent = '';
+  document.getElementById('answer-input').value = '';
+  document.getElementById('answer-input').focus();
+  updateProgressBar();
+
+  timeLeft = totalTime;
+  promptStart = performance.now();
+  startTimer();
+}
+
+function buildHintText(a, b) {
+  const da = a - 100, db = b - 100;
+  const signA = da >= 0 ? `+${da}` : `${da}`;
+  const signB = db >= 0 ? `+${db}` : `${db}`;
+  return `${a} = 100 ${signA}   ${b} = 100 ${signB}`;
+}
+
+function buildMethodText(a, b) {
+  const da = a - 100, db = b - 100;
+  const crosswise = a + db;
+  const product = da * db;
+  const answer = a * b;
+  const signA = da >= 0 ? `+${da}` : `${da}`;
+  const signB = db >= 0 ? `+${db}` : `${db}`;
+  return `step 1: ${a} ${signB} = ${crosswise} → first part\nstep 2: (${da}) × (${db}) = ${product} → last part\nresult: ${crosswise}${String(Math.abs(product)).padStart(2,'0')} = ${answer}`;
+}
+
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  clearTimeout(timerInterval);
+
+  function tick() {
+    const elapsed = (performance.now() - promptStart) / 1000;
+    timeLeft = Math.max(0, totalTime - elapsed);
+    const pct = timeLeft / totalTime;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    document.getElementById('hudTime').textContent = timeLeft.toFixed(1) + 's';
+    if (timeLeft > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else triggerGameOver();
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  clearTimeout(timerInterval);
+}
+
+function submitAnswer() {
+  if (phase !== 'question') return;
+  const raw = document.getElementById('answer-input').value.trim();
+  if (!raw) return;
+  const userAnswer = parseInt(raw);
+  const correctAnswer = currentA * currentB;
+  const responseMs = Math.round(performance.now() - promptStart);
+  const da = currentA - 100, db = currentB - 100;
+  const correct = userAnswer === correctAnswer;
+
+  clearTimers();
+  phase = 'feedback';
+
+  sessionLog.push({
+    time: new Date().toISOString(),
+    session_id: sessionStart.toISOString(),
+    level: currentLevel + 1,
+    level_name: LEVELS[currentLevel].name,
+    number_a: currentA,
+    number_b: currentB,
+    deficit_a: da,
+    deficit_b: db,
+    correct_answer: correctAnswer,
+    user_answer: userAnswer,
+    correct,
+    response_ms: responseMs,
+    time_limit_ms: Math.round(totalTime * 1000)
+  });
+
+  if (correct) {
+    streak++;
+    levelDone++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('hudStreak').textContent = streak;
+    document.getElementById('feedback-msg').textContent = 'correct';
+    document.getElementById('feedback-msg').className = 'fb-ok';
+    document.getElementById('method-reveal').textContent = '';
+    updateProgressBar();
+
+    if (levelDone >= neededForLevel(currentLevel)) {
+      if (currentLevel + 1 < LEVELS.length) {
+        setTimeout(showClear, 400);
+      } else {
+        setTimeout(showClear, 400);
+      }
+    } else {
+      setTimeout(nextQuestion, 500);
+    }
+  } else {
+    streak = 0;
+    document.getElementById('hudStreak').textContent = 0;
+    document.getElementById('feedback-msg').textContent = `wrong — answer was ${correctAnswer}`;
+    document.getElementById('feedback-msg').className = 'fb-err';
+    document.getElementById('method-reveal').textContent = buildMethodText(currentA, currentB);
+    document.getElementById('timer-bar').style.width = '0%';
+    setTimeout(triggerGameOver, 2000);
+  }
+}
+
+function updateProgressBar() {
+  const needed = neededForLevel(currentLevel);
+  const pct = Math.min(100, Math.round(levelDone / needed * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('hudDone').textContent = levelDone;
+  document.getElementById('progress-info').textContent = `${levelDone} / ${needed} · level ${currentLevel+1} · ${LEVELS[currentLevel].name}`;
+}
+
+function showClear() {
+  const lvl = currentLevel + 1;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `Level ${lvl} complete`;
+  document.getElementById('clearTitle').textContent =
+    lvl >= 12 ? 'LEGENDARY!' : lvl >= 8 ? 'BLAZING!' : lvl >= 5 ? 'SHARP!' : 'CLEARED!';
+  document.getElementById('clearMsg').textContent = getClearMsg(lvl);
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  currentLevel++;
+  if (currentLevel >= LEVELS.length) { showGameOver(); return; }
+  show('drill');
+  startLevel();
+}
+
+function triggerGameOver() {
+  clearTimers();
+  phase = 'idle';
+  showGameOver();
+}
+
+function showGameOver() {
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const dur = Math.round((new Date() - sessionStart) / 1000);
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} attempts · ${correct} correct · streak peak: ${getBestStreak()} · ${dur}s`;
+  show('gameover');
+}
+
+function downloadCSV() {
+  const header = 'timestamp,session_id,level,level_name,number_a,number_b,deficit_a,deficit_b,correct_answer,user_answer,correct,response_ms,time_limit_ms';
+  const rows = sessionLog.map(r =>
+    `${r.time},${r.session_id},${r.level},${r.level_name},${r.number_a},${r.number_b},${r.deficit_a},${r.deficit_b},${r.correct_answer},${r.user_answer},${r.correct},${r.response_ms},${r.time_limit_ms}`
+  );
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `near100-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#ffd700','#00f5ff','#ff006e','#00ff88','#ffffff'];
+  const particles = Array.from({length:80}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5,
+    vx: (Math.random()-0.5)*4, vy: Math.random()*3+1,
+    size: Math.random()*6+2, color: colors[Math.floor(Math.random()*colors.length)],
+    alpha: 1, rot: Math.random()*Math.PI*2, rotv: (Math.random()-0.5)*0.2
+  }));
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height); let alive = false;
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.alpha-=0.008; p.rot+=p.rotv;
+      if (p.alpha>0) { alive=true; ctx.save(); ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color; ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); ctx.restore(); }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+</script>
+</body>
+</html>
