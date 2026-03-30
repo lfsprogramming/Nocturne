@@ -377,12 +377,10 @@ function loadAudio() {
   const status = document.getElementById('audioStatus');
   status.textContent = 'loading audio...';
   status.className = 'audio-status';
-  const digits = [0,1,2,3,4,5,6,7,8,9];
   const names = ['zero','one','two','three','four','five','six','seven','eight','nine'];
-  let loaded = 0;
-  let failed = 0;
-  digits.forEach((d, i) => {
-    const audio = new Audio(`/Nocturne/audio/numbers/${names[i]}.m4a`);
+  let loaded = 0, failed = 0;
+  names.forEach((name, d) => {
+    const audio = new Audio(`/Nocturne/audio/numbers/${name}.m4a`);
     audio.preload = 'auto';
     audio.addEventListener('canplaythrough', () => {
       loaded++;
@@ -430,9 +428,11 @@ function show(id) {
 
 document.getElementById('startBtn').addEventListener('click', startSession);
 document.getElementById('retryBtn').addEventListener('click', startSession);
-document.getElementById('menuBtn').addEventListener('click', () => { show('setup'); });
+document.getElementById('menuBtn').addEventListener('click', () => show('setup'));
 document.getElementById('csvBtn').addEventListener('click', downloadCSV);
+
 document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.getElementById('clear').addEventListener('touchend', e => { e.preventDefault(); proceedFromClear(); });
 
 function startSession() {
   currentLevel = 1;
@@ -528,10 +528,11 @@ function blankDisplay() {
 function showRecallUI() {
   phase = 'recall';
   recallStart = performance.now();
-  document.getElementById('digit-display').textContent = '?';
-  document.getElementById('digit-display').classList.remove('blank','audio-mode');
-  document.getElementById('digit-display').style.fontSize = '3rem';
-  document.getElementById('digit-display').style.color = 'var(--muted)';
+  const el = document.getElementById('digit-display');
+  el.textContent = '?';
+  el.classList.remove('blank','audio-mode');
+  el.style.fontSize = '3rem';
+  el.style.color = 'var(--muted)';
   document.getElementById('status-msg').textContent = 'type the sequence';
   document.getElementById('input-area').style.display = 'flex';
   document.getElementById('typed-display').textContent = '_';
@@ -633,11 +634,12 @@ function submitAnswer() {
     if (attemptsLeft <= 0) {
       showGameOver();
     } else {
-      document.getElementById('status-msg').textContent = `wrong — ${attemptsLeft} attempt${attemptsLeft>1?'s':''} left · sequence was: ${currentSequence.join(' ')}`;
-      document.getElementById('digit-display').textContent = currentSequence.join('-');
-      document.getElementById('digit-display').style.fontSize = 'clamp(1.5rem, 5vw, 3rem)';
-      document.getElementById('digit-display').style.color = 'var(--danger)';
-      document.getElementById('digit-display').classList.remove('blank');
+      document.getElementById('status-msg').textContent = `wrong — ${attemptsLeft} attempt${attemptsLeft>1?'s':''} left · was: ${currentSequence.join(' ')}`;
+      const el = document.getElementById('digit-display');
+      el.textContent = currentSequence.join(' ');
+      el.style.fontSize = 'clamp(1.5rem, 5vw, 2.5rem)';
+      el.style.color = 'var(--danger)';
+      el.classList.remove('blank');
       setTimeout(() => generateAndShow(), 2500);
     }
   }
@@ -659,16 +661,17 @@ function showClear() {
   document.getElementById('clearTitle').textContent =
     lvl >= 12 ? 'LEGENDARY!' : lvl >= 8 ? 'BLAZING!' : lvl >= 5 ? 'SHARP!' : 'CLEARED!';
   document.getElementById('clearMsg').textContent = getClearMsg(lvl);
+  waitingForClear = true;
   show('clear');
   spawnParticles();
-  waitingForClear = true;
-  currentLevel++;
 }
 
 function proceedFromClear() {
   if (!waitingForClear) return;
   waitingForClear = false;
+  currentLevel++;
   resetDigitDisplay();
+  show('drill');
   startLevel();
 }
 
@@ -683,7 +686,7 @@ function resetDigitDisplay() {
 function showGameOver() {
   const reached = currentLevel;
   const best = getBest();
-  const isNew = reached > parseInt(localStorage.getItem(getBestKey()) || '0');
+  const isNew = reached > best;
   if (isNew) setBest(reached);
 
   document.getElementById('goLevel').textContent = reached;
@@ -742,7 +745,8 @@ function spawnParticles() {
 
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && document.getElementById('clear').classList.contains('active')) {
-    e.preventDefault(); proceedFromClear();
+    e.preventDefault();
+    proceedFromClear();
   }
 });
 </script>
