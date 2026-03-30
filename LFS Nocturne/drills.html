@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drills — Nocturne</title>
+<link rel="stylesheet" href="style.css">
+<style>
+#drill-wrap{max-width:560px;margin:0 auto;background:#0a0a0f;border-radius:16px;padding:28px;font-family:'IBM Plex Mono',monospace}
+.screen{display:none}
+.screen.active{display:block}
+.mod-card{background:#12121e;border:0.5px solid #2a2a4a;border-radius:8px;padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:border-color 0.15s}
+.mod-card:hover,.mod-card.selected{border-color:#7f77dd}
+.mod-name{font-size:15px;color:#afa9ec;font-weight:500;margin-bottom:2px;font-family:'IBM Plex Mono',monospace}
+.mod-desc{font-size:11px;color:#5a5a7a;letter-spacing:0.06em;font-family:'IBM Plex Mono',monospace}
+.settings-block{margin-top:16px;padding-top:16px;border-top:0.5px solid #1a1a2e}
+.settings-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.settings-row label{font-size:11px;color:#5a5a7a;letter-spacing:0.08em;white-space:nowrap;min-width:160px;font-family:'IBM Plex Mono',monospace}
+.settings-row input[type=range]{flex:1;accent-color:#7f77dd}
+.settings-row span{font-size:13px;color:#afa9ec;min-width:44px;text-align:right;font-family:'IBM Plex Mono',monospace}
+.drill-btn{margin-top:12px;width:100%;background:#1e1e38;border:0.5px solid #534ab7;border-radius:8px;color:#afa9ec;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:12px;cursor:pointer;letter-spacing:0.1em;transition:background 0.15s}
+.drill-btn:hover{background:#2a2a4a}
+#drill-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+#drill-module-name{font-size:11px;color:#5a5a7a;letter-spacing:0.12em;font-family:'IBM Plex Mono',monospace}
+#drill-stats{display:flex;gap:16px}
+.dstat{text-align:center}
+.dstat-val{font-size:18px;font-weight:500;color:#7f77dd;font-family:'IBM Plex Mono',monospace}
+.dstat-lbl{font-size:10px;color:#5a5a7a;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace}
+#timer-bar-bg,#progress-bar-bg{height:3px;background:#1a1a2e;border-radius:2px;margin-bottom:8px}
+#timer-bar,#progress-bar{height:3px;border-radius:2px;transition:width 0.1s linear}
+#timer-bar{background:#7f77dd}
+#progress-bar{background:#1d9e75;transition:width 0.3s ease}
+#drill-level-info{font-size:11px;color:#534ab7;letter-spacing:0.1em;margin-bottom:20px;text-align:center;font-family:'IBM Plex Mono',monospace}
+#drill-question{font-size:34px;font-weight:500;color:#fff;text-align:center;margin-bottom:8px;min-height:44px;letter-spacing:0.04em;font-family:'IBM Plex Mono',monospace}
+#drill-topic{font-size:11px;color:#5a5a7a;letter-spacing:0.1em;text-align:center;margin-bottom:24px;font-family:'IBM Plex Mono',monospace}
+#answer-area{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.ans-group{display:flex;align-items:center;gap:6px}
+.ans-label{font-size:13px;color:#5a5a7a;letter-spacing:0.06em;font-family:'IBM Plex Mono',monospace}
+.ans-input{background:#12121e;border:0.5px solid #3a3a5a;border-radius:6px;color:#fff;font-family:'IBM Plex Mono',monospace;font-size:20px;padding:8px 12px;width:120px;text-align:center;outline:none;transition:border-color 0.15s}
+.ans-input:focus{border-color:#7f77dd}
+.ans-input.wrong{border-color:#e24b4a;color:#e24b4a}
+#check-icon{font-size:22px;color:#5dcaa5;text-align:center;min-height:28px;margin-bottom:4px;font-family:'IBM Plex Mono',monospace}
+#drill-feedback{text-align:center;font-size:14px;min-height:20px;letter-spacing:0.05em;margin-bottom:10px;font-family:'IBM Plex Mono',monospace}
+.fb-ok{color:#5dcaa5}
+.fb-err{color:#e24b4a}
+#correct-reveal{text-align:center;margin:12px 0 20px;font-size:20px;color:#afa9ec;letter-spacing:0.06em;min-height:28px;font-family:'IBM Plex Mono',monospace}
+#drill-end-btns{display:none}
+#s-levelup{text-align:center;padding:20px 0;position:relative}
+#levelup-title{font-size:32px;font-weight:500;color:#7f77dd;letter-spacing:0.08em;margin-bottom:8px;font-family:'IBM Plex Mono',monospace}
+#levelup-sub,#levelup-next,#levelup-stats{font-family:'IBM Plex Mono',monospace}
+#levelup-sub{font-size:13px;color:#5a5a7a;letter-spacing:0.1em;margin-bottom:4px}
+#levelup-next{font-size:16px;color:#afa9ec;letter-spacing:0.06em;margin-bottom:8px}
+#levelup-stats{font-size:11px;color:#534ab7;letter-spacing:0.08em;margin-bottom:32px}
+#particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+#s-end{text-align:center;padding:40px 0}
+#end-title{font-size:22px;font-weight:500;color:#7f77dd;margin-bottom:8px;font-family:'IBM Plex Mono',monospace}
+#end-sub{font-size:13px;color:#5a5a7a;margin-bottom:32px;letter-spacing:0.06em;font-family:'IBM Plex Mono',monospace}
+.menu-h{font-size:11px;color:#5a5a7a;letter-spacing:0.12em;margin-bottom:16px;font-family:'IBM Plex Mono',monospace}
+</style>
+</head>
+<body>
+
+<link rel="stylesheet" href="style.css">
+<script src="nav.js"></script>
+
+<div class="page-wrap">
+<div id="drill-wrap">
+
+<div id="s-menu" class="screen active">
+  <div class="menu-h">select a module to begin</div>
+  <div id="module-list"></div>
+  <div class="settings-block">
+    <div class="settings-row">
+      <label>starting time / answer</label>
+      <input type="range" id="sl-time" min="3" max="30" step="1" value="10">
+      <span id="out-time">10s</span>
+    </div>
+    <div class="settings-row">
+      <label>answers to pass level 1</label>
+      <input type="range" id="sl-answers" min="5" max="50" step="1" value="20">
+      <span id="out-answers">20</span>
+    </div>
+    <div class="settings-row">
+      <label>time kept per level</label>
+      <input type="range" id="sl-decay" min="70" max="99" step="1" value="95">
+      <span id="out-decay">95%</span>
+    </div>
+  </div>
+  <button class="drill-btn" id="start-btn">start ladder ↑</button>
+</div>
+
+<div id="s-drill" class="screen">
+  <div id="drill-header">
+    <div id="drill-module-name">—</div>
+    <div id="drill-stats">
+      <div class="dstat"><div class="dstat-val" id="d-score">0</div><div class="dstat-lbl">score</div></div>
+      <div class="dstat"><div class="dstat-val" id="d-streak">0</div><div class="dstat-lbl">streak</div></div>
+      <div class="dstat"><div class="dstat-val" id="d-level">1</div><div class="dstat-lbl">level</div></div>
+    </div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar" style="width:100%"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar" style="width:0%"></div></div>
+  <div id="drill-level-info">level 1</div>
+  <div id="drill-question">—</div>
+  <div id="drill-topic">—</div>
+  <div id="answer-area"></div>
+  <div id="check-icon"></div>
+  <div id="drill-feedback"></div>
+  <div id="correct-reveal"></div>
+  <div id="drill-end-btns">
+    <button class="drill-btn" id="btn-retry-drill">try again ↺</button>
+    <button class="drill-btn" id="btn-menu-drill">change module / time ←</button>
+  </div>
+</div>
+
+<div id="s-levelup" class="screen">
+  <canvas id="particles"></canvas>
+  <div id="levelup-title">level up</div>
+  <div id="levelup-sub"></div>
+  <div id="levelup-next"></div>
+  <div id="levelup-stats"></div>
+  <button class="drill-btn" id="btn-continue" style="max-width:300px;margin:0 auto;display:block">ready — continue ↑</button>
+  <button class="drill-btn" id="btn-menu-levelup" style="max-width:300px;margin:0 auto;display:block">change module / time ←</button>
+</div>
+
+<div id="s-end" class="screen">
+  <div id="end-title">game over</div>
+  <div id="end-sub"></div>
+  <button class="drill-btn" id="btn-retry">try again ↺</button>
+  <button class="drill-btn" id="btn-menu">change module / time ←</button>
+</div>
+
+</div>
+</div>
+
+<footer>nocturne &mdash; built slowly, in the dark</footer>
+
+<script type="module">
+const MODULES = {};
+let selectedMod = null;
+let state = {};
+let timerInterval = null;
+let particleAnim = null;
+const MODULE_FILES = ['arithmetic.js','vedic.js'];
+
+async function loadModules() {
+  for (const f of MODULE_FILES) {
+    try {
+      const mod = await import('./modules/' + f);
+      if (mod.default && mod.default.name) MODULES[f.replace('.js','')] = mod.default;
+    } catch(e) { console.warn('failed to load', f, e); }
+  }
+  if (Object.keys(MODULES).length === 0) {
+    document.getElementById('module-list').innerHTML = '<div style="color:#e24b4a;font-size:13px;font-family:monospace">no modules loaded. run via: python3 -m http.server 8080</div>';
+    return;
+  }
+  selectedMod = Object.keys(MODULES)[0];
+  buildMenu();
+}
+
+function buildMenu() {
+  const list = document.getElementById('module-list');
+  list.innerHTML = '';
+  Object.entries(MODULES).forEach(([key, mod]) => {
+    const card = document.createElement('div');
+    card.className = 'mod-card' + (key === selectedMod ? ' selected' : '');
+    card.innerHTML = '<div class="mod-name">' + mod.name + '</div><div class="mod-desc">' + mod.desc + '</div>';
+    card.addEventListener('click', () => {
+      selectedMod = key;
+      document.querySelectorAll('.mod-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+    list.appendChild(card);
+  });
+}
+
+function getSettings() {
+  return {
+    startTime: parseInt(document.getElementById('sl-time').value),
+    startAnswers: parseInt(document.getElementById('sl-answers').value),
+    decay: parseInt(document.getElementById('sl-decay').value) / 100
+  };
+}
+
+document.getElementById('sl-time').addEventListener('input', function() { document.getElementById('out-time').textContent = this.value + 's'; });
+document.getElementById('sl-answers').addEventListener('input', function() { document.getElementById('out-answers').textContent = this.value; });
+document.getElementById('sl-decay').addEventListener('input', function() { document.getElementById('out-decay').textContent = this.value + '%'; });
+document.getElementById('start-btn').addEventListener('click', startDrill);
+document.getElementById('btn-retry').addEventListener('click', startDrill);
+document.getElementById('btn-menu').addEventListener('click', () => { buildMenu(); show('menu'); });
+document.getElementById('btn-retry-drill').addEventListener('click', startDrill);
+document.getElementById('btn-menu-drill').addEventListener('click', () => { buildMenu(); show('menu'); });
+document.getElementById('btn-continue').addEventListener('click', () => { show('drill'); nextQuestion(); });
+document.getElementById('btn-menu-levelup').addEventListener('click', () => { buildMenu(); show('menu'); });
+
+function show(s) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById('s-' + s).classList.add('active');
+}
+
+function answersForLevel(level) { return state.settings.startAnswers + level; }
+function timeForLevel(level) { return Math.max(2, state.settings.startTime * Math.pow(state.settings.decay, level)); }
+
+function startDrill() {
+  const settings = getSettings();
+  const mod = MODULES[selectedMod];
+  state = { mod, settings, level: 0, levelCorrect: 0, score: 0, streak: 0, current: null };
+  document.getElementById('drill-module-name').textContent = mod.name.toUpperCase();
+  document.getElementById('d-score').textContent = '0';
+  document.getElementById('d-streak').textContent = '0';
+  document.getElementById('d-level').textContent = '1';
+  document.getElementById('drill-end-btns').style.display = 'none';
+  document.getElementById('correct-reveal').textContent = '';
+  show('drill');
+  nextQuestion();
+}
+
+function nextQuestion() {
+  clearInterval(timerInterval);
+  document.getElementById('drill-end-btns').style.display = 'none';
+  document.getElementById('correct-reveal').textContent = '';
+  const lv = state.mod.levels[state.level];
+  const totalTime = timeForLevel(state.level);
+  state.current = lv.gen();
+  state.totalTime = totalTime;
+  document.getElementById('drill-question').textContent = state.current.q;
+  document.getElementById('drill-topic').textContent = state.current.topic || '';
+  document.getElementById('drill-feedback').textContent = '';
+  document.getElementById('drill-feedback').className = '';
+  document.getElementById('check-icon').textContent = '';
+  updateProgressBar();
+  const area = document.getElementById('answer-area');
+  area.innerHTML = '';
+  state.current.answers.forEach((a) => {
+    const grp = document.createElement('div');
+    grp.className = 'ans-group';
+    if (a.label) { const lbl = document.createElement('span'); lbl.className = 'ans-label'; lbl.textContent = a.label + ' ='; grp.appendChild(lbl); }
+    const inp = document.createElement('input');
+    inp.className = 'ans-input'; inp.type = 'text'; inp.inputMode = 'numeric'; inp.placeholder = '?'; inp.autocomplete = 'off';
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
+    grp.appendChild(inp);
+    area.appendChild(grp);
+  });
+  area.querySelectorAll('.ans-input')[0].focus();
+  state.timeLeft = totalTime;
+  updateTimerBar(1);
+  timerInterval = setInterval(() => {
+    state.timeLeft -= 0.1;
+    const pct = Math.max(0, state.timeLeft / state.totalTime);
+    updateTimerBar(pct);
+    if (state.timeLeft <= 0) { clearInterval(timerInterval); endGame("time's up", state.current); }
+  }, 100);
+}
+
+function updateTimerBar(pct) {
+  const bar = document.getElementById('timer-bar');
+  bar.style.width = (pct * 100) + '%';
+  bar.style.background = pct > 0.5 ? '#7f77dd' : pct > 0.25 ? '#ef9f27' : '#e24b4a';
+}
+
+function updateProgressBar() {
+  const needed = answersForLevel(state.level);
+  const pct = Math.min(100, Math.round(state.levelCorrect / needed * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('drill-level-info').textContent =
+    'level ' + (state.level + 1) + ' — ' + state.mod.levels[state.level].name + '   ·   ' + state.levelCorrect + ' / ' + needed;
+  document.getElementById('d-level').textContent = state.level + 1;
+}
+
+function norm(s) { return String(s).replace(/\s/g, '').toLowerCase(); }
+
+function checkAnswer() {
+  const inputs = document.querySelectorAll('.ans-input');
+  let allCorrect = true;
+  inputs.forEach((inp, i) => { if (norm(inp.value) !== norm(String(state.current.answers[i].ans))) allCorrect = false; });
+  if (allCorrect) {
+    clearInterval(timerInterval);
+    state.score += 10 + state.streak; state.streak++; state.levelCorrect++;
+    document.getElementById('d-score').textContent = state.score;
+    document.getElementById('d-streak').textContent = state.streak;
+    document.getElementById('check-icon').textContent = '✓';
+    document.getElementById('drill-feedback').textContent = 'correct';
+    document.getElementById('drill-feedback').className = 'fb-ok';
+    updateProgressBar();
+    const needed = answersForLevel(state.level);
+    const hasNext = state.level < state.mod.levels.length - 1;
+    if (state.levelCorrect >= needed && hasNext) {
+      state.levelCorrect = 0;
+      setTimeout(() => showLevelUp(state.level, state.level + 1), 500);
+    } else {
+      setTimeout(nextQuestion, 500);
+    }
+  } else {
+    clearInterval(timerInterval);
+    endGame('incorrect answer', state.current);
+  }
+}
+
+function showLevelUp(currentLevel, nextLevel) {
+  const completedName = state.mod.levels[currentLevel].name;
+  const nextName = state.mod.levels[nextLevel] ? state.mod.levels[nextLevel].name : 'speed round';
+  state.level = nextLevel;
+  document.getElementById('levelup-sub').textContent = 'completed: ' + completedName;
+  document.getElementById('levelup-next').textContent = 'next: ' + nextName;
+  document.getElementById('levelup-stats').textContent =
+    answersForLevel(nextLevel) + ' correct required  ·  ' + timeForLevel(nextLevel).toFixed(1) + 's per question';
+  show('levelup');
+  startParticles();
+}
+
+function startParticles() {
+  if (particleAnim) cancelAnimationFrame(particleAnim);
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth || 500;
+  canvas.height = canvas.offsetHeight || 400;
+  const colors = ['#7f77dd','#5dcaa5','#afa9ec','#ef9f27','#c8a96e','#f4c0d1'];
+  const particles = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width,
+    y: canvas.height * 0.4 + Math.random() * canvas.height * 0.2,
+    r: Math.random() * 4 + 2,
+    c: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - 0.5) * 3,
+    vy: (Math.random() * -5) - 2,
+    alpha: 1
+  }));
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.alpha -= 0.007;
+      if (p.alpha > 0) {
+        alive = true;
+        ctx.globalAlpha = p.alpha; ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      }
+    });
+    ctx.globalAlpha = 1;
+    if (alive) particleAnim = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function endGame(reason, q) {
+  const cs = q.answers.map(a => a.label ? a.label + ' = ' + a.ans : String(a.ans)).join('  ·  ');
+  document.querySelectorAll('.ans-input').forEach(inp => inp.classList.add('wrong'));
+  document.getElementById('drill-feedback').textContent = reason;
+  document.getElementById('drill-feedback').className = 'fb-err';
+  document.getElementById('correct-reveal').textContent = '→ ' + cs;
+  document.getElementById('drill-end-btns').style.display = 'block';
+  updateTimerBar(0);
+}
+
+loadModules();
+</script>
+</body>
+</html>
+```
+
+---
+
+Your folder structure should now be:
+```
+nocturne/
+  index.html
+  style.css
+  drill.html
+  modules/
+    arithmetic.js
+    vedic.js
