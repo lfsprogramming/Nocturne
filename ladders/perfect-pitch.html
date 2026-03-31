@@ -1,74 +1,836 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ladders — Nocturne</title>
-<link rel="stylesheet" href="style.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Perfect Pitch — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --purple: #a855f7;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--purple), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(168,85,247,0.4));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(168,85,247,0.3)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(168,85,247,0.7)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 28px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+/* pitch map reference */
+.pitch-map {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  width: min(340px, 90vw);
+}
+.pm-cell {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 2px; padding: 5px 2px;
+}
+.pm-name { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--accent); line-height: 1; }
+.pm-note { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.05em; margin-top: 2px; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--purple); background: transparent;
+  color: var(--purple); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--purple); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #fff; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+#progress-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--purple); transition: width 0.3s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px; padding: 20px;
+  width: 100%; max-width: 500px; margin: 0 auto;
+}
+
+.level-badge {
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase;
+  text-align: center; line-height: 1.8;
+}
+
+/* active pitch pool display */
+.pool-display {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  max-width: 320px;
+}
+.pool-pill {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.1em;
+  padding: 3px 10px; border-radius: 2px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+  transition: all 0.2s;
+}
+.pool-pill.active { border-color: var(--purple); color: var(--purple); background: rgba(168,85,247,0.08); }
+
+/* play button */
+.play-area { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+.play-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.2em;
+  padding: 14px 36px; border: 2px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 2px; transition: all 0.15s;
+  display: flex; align-items: center; gap: 10px;
+}
+.play-btn:hover:not(:disabled) { background: rgba(0,245,255,0.08); }
+.play-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.play-btn .play-icon { font-size: 1.2rem; }
+
+.sequence-dots {
+  display: flex; gap: 8px; justify-content: center; min-height: 16px;
+}
+.sdot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1px solid var(--muted); background: transparent;
+  transition: all 0.15s;
+}
+.sdot.played { background: var(--purple); border-color: var(--purple); }
+.sdot.current { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+/* answer area — multi-input for sequences */
+.answer-area { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+
+.answer-inputs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+.pitch-input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 1.4rem;
+  padding: 10px 12px; width: 80px; text-align: center; outline: none;
+  transition: border-color 0.15s; text-transform: lowercase;
+}
+.pitch-input:focus { border-color: var(--purple); }
+.pitch-input.correct { border-color: var(--green); color: var(--green); }
+.pitch-input.wrong { border-color: var(--danger); color: var(--danger); }
+
+.submit-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.15em;
+  padding: 10px 28px; border: 1px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 4px; transition: all 0.15s;
+}
+.submit-btn:hover { background: var(--accent); color: #000; }
+.submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* feedback */
+#feedback-area { text-align: center; min-height: 50px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#feedback-msg { font-size: 0.85rem; letter-spacing: 0.08em; min-height: 20px; }
+.fb-ok  { color: var(--green); }
+.fb-err { color: var(--danger); }
+#reveal-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; min-height: 28px; }
+.reveal-chip {
+  font-family: 'Bebas Neue', sans-serif; font-size: 0.9rem; letter-spacing: 0.1em;
+  padding: 2px 10px; border-radius: 2px; border: 1px solid var(--gold); color: var(--gold);
+  background: rgba(255,215,0,0.06);
+}
+
+#progress-info { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── CLEAR ── */
+#clear { gap: 12px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label { font-size: 0.75rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+.clear-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  background: linear-gradient(135deg, var(--gold), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(168,85,247,0.5));
+  animation: clearpop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes clearpop { 0% { transform: scale(0.2) rotate(-5deg); opacity:0; } 100% { transform: scale(1) rotate(0); opacity:1; } }
+.clear-msg { font-size: 0.8rem; color: var(--text); letter-spacing: 0.08em; max-width: 340px; line-height: 1.9; }
+.clear-msg .pitch-name { color: var(--purple); font-family: 'Bebas Neue', sans-serif; font-size: 1rem; }
+.clear-next { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+</style>
 </head>
 <body>
 
-<link rel="stylesheet" href="style.css">
-<script src="nav.js"></script>
+<!-- ══════════════════════════════════════════════════
+     SETUP SCREEN
+═══════════════════════════════════════════════════ -->
+<div id="setup" class="screen active">
+  <div class="logo">Perfect Pitch</div>
+  <div class="tagline">ear training — circle of fifths — automaticity</div>
 
-<div class="page-wrap">
-
-  <div class="page-header">
-    <h1>Ladders</h1>
-    <p class="byline">recognition and memory drills — escalating speed, built for automaticity</p>
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
   </div>
 
-  <div class="card-grid">
-
-    <a href="ladders/general-ladder.html" class="card">
-      <div class="card-label">memory</div>
-      <div class="card-title">General Ladder</div>
-      <div class="card-desc">Text or Image input.</div>
-    </a>
-
-    <a href="ladders/digit-span.html" class="card">
-     <div class="card-label">memory</div>
-      <div class="card-title">Digit Span</div>
-      <div class="card-desc">Ericsson method. Visual or audio. Tracks response time and exports your training log as CSV.</div>
-    </a>
-
-    <a href="ladders/near-100.html" class="card">
-      <div class="card-label">vedic math</div>
-      <div class="card-title">Near-100 Drill</div>
-      <div class="card-desc">Vedic base-100 multiplication. 12 levels from 98×99 to the full 88–105 range. Timed, with method hints and CSV export.</div>
-    </a>
-
-    <div class="card" style="cursor:default;opacity:0.4">
-      <div class="card-label">coming soon</div>
-      <div class="card-title">Hiragana</div>
-      <div class="card-desc">Japanese hiragana recognition. Timed drills with spaced repetition weighting.</div>
-    </div>
-
-    <div class="card" style="cursor:default;opacity:0.4">
-      <div class="card-label">coming soon</div>
-      <div class="card-title">Katakana</div>
-      <div class="card-desc">Japanese katakana recognition. Builds on hiragana fluency.</div>
-    </div>
-
-    <div class="card" style="cursor:default;opacity:0.4">
-      <div class="card-label">coming soon</div>
-      <div class="card-title">Kanji</div>
-      <div class="card-desc">High-frequency kanji recognition. Readings and meanings.</div>
-    </div>
-
-    <div class="card" style="cursor:default;opacity:0.4">
-      <div class="card-label">coming soon</div>
-      <div class="card-title">Playing Cards</div>
-      <div class="card-desc">Card-to-PAO mapping for memory competitions.</div>
-    </div>
-
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:min(340px,90vw)">
+    <div class="section-label">your pitch system</div>
+    <div class="pitch-map" id="pitchMapDisplay"></div>
   </div>
 
+  <button class="start-btn" id="startBtn">start climbing</button>
+  <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:300px;line-height:1.8;">
+    levels 1–11 · single pitch identification<br>
+    levels 12+ · multi-pitch sequences
+  </div>
 </div>
 
-<footer>nocturne &mdash; built slowly, in the dark</footer>
+<!-- ══════════════════════════════════════════════════
+     DRILL SCREEN
+═══════════════════════════════════════════════════ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">10</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+    <div class="hud-stat"><div class="val" id="hudPhase">1</div><div class="lbl">Phase</div></div>
+  </div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
 
+  <div id="drill-body">
+    <div class="level-badge" id="levelBadge"></div>
+
+    <div class="pool-display" id="poolDisplay"></div>
+
+    <div class="play-area">
+      <button class="play-btn" id="playBtn">
+        <span class="play-icon">▶</span> play pitch
+      </button>
+      <div class="sequence-dots" id="sequenceDots"></div>
+    </div>
+
+    <div class="answer-area">
+      <div class="answer-inputs" id="answerInputs"></div>
+      <button class="submit-btn" id="submitBtn" disabled>submit</button>
+    </div>
+
+    <div id="feedback-area">
+      <div id="feedback-msg"></div>
+      <div id="reveal-row"></div>
+    </div>
+
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     CLEAR SCREEN
+═══════════════════════════════════════════════════ -->
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title" id="clearTitle">CLEARED!</div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ tap or press space to continue</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     GAME OVER SCREEN
+═══════════════════════════════════════════════════ -->
+<div id="gameover" class="screen">
+  <div class="go-title">wrong</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.7rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">▶ try again</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// PITCH DATA
+// ══════════════════════════════════════════════════
+
+const AUDIO_BASE = '../audio/pitches/system/';
+
+// Circle of fifths order: C, F, Bb, Eb, Ab, Db/C#, Gb/F#, B, E, A, D, G
+const PITCHES = [
+  { name: 'go',  note: 'C'  },
+  { name: 'va',  note: 'F'  },
+  { name: 'ru',  note: 'A#' },
+  { name: 'he',  note: 'D#' },
+  { name: 'lo',  note: 'G#' },
+  { name: 'ma',  note: 'C#' },
+  { name: 'shu', note: 'F#' },
+  { name: 'be',  note: 'B'  },
+  { name: 'no',  note: 'E'  },
+  { name: 'za',  note: 'A'  },
+  { name: 'du',  note: 'D'  },
+  { name: 'je',  note: 'G'  },
+];
+
+// Phase 1: levels 1–11, single pitch, pool grows 1 pitch at a time
+// Level 1: pool = [go, va]           (2 pitches to distinguish)
+// Level 2: pool = [go, va, ru]       (3 pitches)
+// ...
+// Level 11: pool = all 12 pitches
+
+// Phase 2: levels 12+, sequence of N pitches, pool resets and grows again
+// Level 12: 2 pitches in sequence, pool = [go, va]
+// Level 13: 2 pitches in sequence, pool = [go, va, ru]
+// ...
+// Level 22: 2 pitches in sequence, full pool → advance sequence to 3
+// etc.
+
+function getLevelConfig(levelIndex) {
+  // Phase 1: levels 0–10 (displayed 1–11)
+  if (levelIndex < 11) {
+    const poolSize = levelIndex + 2; // 2 to 12
+    return {
+      phase: 1,
+      pool: PITCHES.slice(0, poolSize),
+      seqLen: 1,
+      needed: 8 + levelIndex,
+      desc: `identify · ${poolSize} pitch${poolSize > 1 ? 'es' : ''}`,
+    };
+  }
+  // Phase 2+: each "tier" of seqLen has 11 sub-levels (pool grows from 2 to 12)
+  const phase2Index = levelIndex - 11; // 0-based within phase 2
+  const seqLen = 2 + Math.floor(phase2Index / 11);
+  const subLevel = phase2Index % 11;
+  const poolSize = subLevel + 2;
+  return {
+    phase: 2,
+    pool: PITCHES.slice(0, poolSize),
+    seqLen,
+    needed: 10 + seqLen * 2,
+    desc: `sequence · ${seqLen} pitches · ${poolSize} in pool`,
+  };
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let currentLevel = 0;
+let levelDone = 0;
+let streak = 0;
+let sessionStart = null;
+let sessionLog = [];
+let waitingForClear = false;
+let phase = 'idle'; // 'question' | 'feedback' | 'idle'
+
+let currentSequence = [];  // array of pitch names in order
+let playIndex = 0;         // which pitch in sequence is next to play
+let audioCache = {};
+
+// ══════════════════════════════════════════════════
+// AUDIO
+// ══════════════════════════════════════════════════
+
+function getAudio(name) {
+  if (!audioCache[name]) {
+    audioCache[name] = new Audio(AUDIO_BASE + name + '.m4a');
+  }
+  return audioCache[name];
+}
+
+function preloadAll() {
+  PITCHES.forEach(p => getAudio(p.name));
+}
+
+function playPitch(name, cb) {
+  const a = getAudio(name);
+  a.currentTime = 0;
+  const onEnd = () => { a.removeEventListener('ended', onEnd); if (cb) cb(); };
+  a.addEventListener('ended', onEnd);
+  a.play().catch(() => { if (cb) cb(); });
+}
+
+function playSequence(seq, onDone) {
+  let i = 0;
+  function next() {
+    if (i >= seq.length) { if (onDone) onDone(); return; }
+    const name = seq[i++];
+    // light up dot
+    updateDots(i - 1, 'current');
+    playPitch(name, () => {
+      updateDots(i - 1, 'played');
+      next();
+    });
+  }
+  next();
+}
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('ppBestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('ppBestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('ppBestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('ppBestStreak', v); refreshBest(); }
+
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent  = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+}
+
+// ══════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function renderPitchMap() {
+  const el = document.getElementById('pitchMapDisplay');
+  el.innerHTML = PITCHES.map(p =>
+    `<div class="pm-cell">
+      <div class="pm-name">${p.name}</div>
+      <div class="pm-note">${p.note}</div>
+    </div>`
+  ).join('');
+}
+
+function renderPool(pool) {
+  const el = document.getElementById('poolDisplay');
+  el.innerHTML = pool.map(p =>
+    `<div class="pool-pill" id="pill-${p.name}">${p.name}</div>`
+  ).join('');
+}
+
+function highlightPills(names) {
+  document.querySelectorAll('.pool-pill').forEach(el => el.classList.remove('active'));
+  names.forEach(n => {
+    const el = document.getElementById('pill-' + n);
+    if (el) el.classList.add('active');
+  });
+}
+
+function renderDots(count) {
+  const el = document.getElementById('sequenceDots');
+  el.innerHTML = Array.from({length: count}, (_, i) =>
+    `<div class="sdot" id="dot-${i}"></div>`
+  ).join('');
+}
+
+function updateDots(index, state) {
+  // state: 'played' | 'current' | ''
+  const dot = document.getElementById('dot-' + index);
+  if (!dot) return;
+  dot.className = 'sdot' + (state ? ' ' + state : '');
+}
+
+function resetDots(count) {
+  for (let i = 0; i < count; i++) updateDots(i, '');
+}
+
+function renderInputs(count) {
+  const el = document.getElementById('answerInputs');
+  el.innerHTML = Array.from({length: count}, (_, i) =>
+    `<input class="pitch-input" id="input-${i}" type="text" maxlength="4"
+      autocomplete="off" autocorrect="off" spellcheck="false"
+      placeholder="?" data-index="${i}">`
+  ).join('');
+  // tab between inputs
+  el.querySelectorAll('.pitch-input').forEach((inp, i, all) => {
+    inp.addEventListener('input', () => {
+      // auto-advance on known pitch names
+      const val = inp.value.toLowerCase().trim();
+      if (isPitchName(val) && i < all.length - 1) all[i+1].focus();
+      checkSubmitReady();
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (i < all.length - 1) all[i+1].focus();
+        else submitAnswer();
+      }
+      if (e.key === 'Backspace' && inp.value === '' && i > 0) all[i-1].focus();
+    });
+  });
+  // focus first
+  const first = document.getElementById('input-0');
+  if (first) setTimeout(() => first.focus(), 100);
+}
+
+function isPitchName(val) {
+  return PITCHES.some(p => p.name === val);
+}
+
+function checkSubmitReady() {
+  const inputs = document.querySelectorAll('.pitch-input');
+  const allFilled = Array.from(inputs).every(i => i.value.trim().length > 0);
+  document.getElementById('submitBtn').disabled = !allFilled || phase !== 'question';
+}
+
+function getInputValues() {
+  return Array.from(document.querySelectorAll('.pitch-input')).map(i => i.value.toLowerCase().trim());
+}
+
+function colorInputs(userAnswers, correct) {
+  userAnswers.forEach((val, i) => {
+    const inp = document.getElementById('input-' + i);
+    if (!inp) return;
+    inp.classList.add(val === correct[i] ? 'correct' : 'wrong');
+    inp.readOnly = true;
+  });
+}
+
+function updateProgressBar() {
+  const cfg = getLevelConfig(currentLevel);
+  const pct = Math.min(100, Math.round(levelDone / cfg.needed * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('hudDone').textContent = levelDone;
+  document.getElementById('hudNeeded').textContent = cfg.needed;
+  document.getElementById('progress-info').textContent =
+    `${levelDone} / ${cfg.needed} · level ${currentLevel + 1} · ${cfg.desc}`;
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  preloadAll();
+  show('drill');
+  startLevel();
+}
+
+function startLevel() {
+  levelDone = 0;
+  const cfg = getLevelConfig(currentLevel);
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudPhase').textContent = cfg.phase;
+  document.getElementById('levelBadge').textContent =
+    `phase ${cfg.phase}  ·  ${cfg.desc}`;
+
+  const playLabel = cfg.seqLen === 1 ? 'play pitch' : `play sequence (${cfg.seqLen})`;
+  document.getElementById('playBtn').querySelector('span:last-child') && null;
+  document.getElementById('playBtn').innerHTML = `<span class="play-icon">▶</span> ${playLabel}`;
+
+  renderPool(cfg.pool);
+  renderDots(cfg.seqLen);
+  renderInputs(cfg.seqLen);
+  updateProgressBar();
+  nextQuestion();
+}
+
+function generateSequence(cfg) {
+  const seq = [];
+  let last = null;
+  for (let i = 0; i < cfg.seqLen; i++) {
+    let pick;
+    let tries = 0;
+    do {
+      pick = cfg.pool[Math.floor(Math.random() * cfg.pool.length)].name;
+      tries++;
+    } while (pick === last && cfg.pool.length > 1 && tries < 20);
+    seq.push(pick);
+    last = pick;
+  }
+  return seq;
+}
+
+function nextQuestion() {
+  phase = 'question';
+  const cfg = getLevelConfig(currentLevel);
+  currentSequence = generateSequence(cfg);
+
+  // reset UI
+  resetDots(cfg.seqLen);
+  renderInputs(cfg.seqLen);
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = '';
+  document.getElementById('reveal-row').innerHTML = '';
+  document.getElementById('submitBtn').disabled = true;
+  highlightPills([]);
+
+  // auto-play after brief pause
+  document.getElementById('playBtn').disabled = true;
+  setTimeout(() => {
+    document.getElementById('playBtn').disabled = false;
+    playCurrentSequence();
+  }, 300);
+}
+
+function playCurrentSequence() {
+  if (phase !== 'question') return;
+  document.getElementById('playBtn').disabled = true;
+  resetDots(getLevelConfig(currentLevel).seqLen);
+  playSequence(currentSequence, () => {
+    document.getElementById('playBtn').disabled = false;
+    // focus first empty input
+    const first = document.getElementById('input-0');
+    if (first) first.focus();
+    checkSubmitReady();
+  });
+}
+
+function submitAnswer() {
+  if (phase !== 'question') return;
+  const userAnswers = getInputValues();
+  if (userAnswers.some(v => v === '')) return;
+
+  phase = 'feedback';
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('playBtn').disabled = true;
+
+  const correct = currentSequence;
+  const isCorrect = userAnswers.every((v, i) => v === correct[i]);
+
+  colorInputs(userAnswers, correct);
+  highlightPills(correct);
+
+  sessionLog.push({
+    time: new Date().toISOString(),
+    level: currentLevel + 1,
+    sequence: correct.join('-'),
+    userAnswer: userAnswers.join('-'),
+    correct: isCorrect,
+  });
+
+  if (isCorrect) {
+    streak++;
+    levelDone++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('hudStreak').textContent = streak;
+    document.getElementById('feedback-msg').textContent = 'correct';
+    document.getElementById('feedback-msg').className = 'fb-ok';
+    updateProgressBar();
+
+    const cfg = getLevelConfig(currentLevel);
+    if (levelDone >= cfg.needed) {
+      setTimeout(showClear, 500);
+    } else {
+      setTimeout(nextQuestion, 600);
+    }
+  } else {
+    streak = 0;
+    document.getElementById('hudStreak').textContent = 0;
+    document.getElementById('feedback-msg').textContent = 'wrong';
+    document.getElementById('feedback-msg').className = 'fb-err';
+    // reveal correct answer as chips
+    document.getElementById('reveal-row').innerHTML = correct.map(n =>
+      `<div class="reveal-chip">${n}</div>`
+    ).join('');
+    setTimeout(showGameOver, 2200);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR / LEVEL UP
+// ══════════════════════════════════════════════════
+
+const CLEAR_MESSAGES = [
+  () => `<span class="pitch-name">go</span> vs <span class="pitch-name">va</span>. C and F. The anchor pair. Now build.`,
+  () => `<span class="pitch-name">ru</span> (A#/Bb) enters the ring. Three pitches in your ear.`,
+  () => `<span class="pitch-name">he</span> (D#/Eb). The flat keys are forming.`,
+  () => `<span class="pitch-name">lo</span> (G#/Ab). Five pitches. Your ear is triangulating.`,
+  () => `<span class="pitch-name">ma</span> (C#/Db). The sharp keys now. Six total.`,
+  () => `<span class="pitch-name">shu</span> (F#). Halfway through the chromatic scale.`,
+  () => `<span class="pitch-name">be</span> (B). Eight pitches. Your brain is building a tonal map.`,
+  () => `<span class="pitch-name">no</span> (E). Natural keys entering. Nine down.`,
+  () => `<span class="pitch-name">za</span> (A). Ten pitches. Rare air.`,
+  () => `<span class="pitch-name">du</span> (D). Eleven pitches. One to go.`,
+  () => `All 12 pitches. The full chromatic field. Phase 2 begins — sequences now.`,
+  () => `First 2-pitch sequences. Small pool. Learn the pairs.`,
+  () => `Pool growing. Keep the sequence in your ear.`,
+  () => `Sequences of 2, wider pool. Your short-term pitch memory is training.`,
+  () => `Three-pitch sequences begin. Hold more in your inner ear.`,
+  () => `Sequences of 3. The pool expands again.`,
+];
+
+function getClearMsg(lvl) {
+  const fn = CLEAR_MESSAGES[Math.min(lvl - 1, CLEAR_MESSAGES.length - 1)];
+  return fn ? fn() : `Level ${lvl} complete. Keep climbing.`;
+}
+
+function showClear() {
+  const lvl = currentLevel + 1;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `Level ${lvl} complete`;
+  const cfg = getLevelConfig(currentLevel);
+  document.getElementById('clearTitle').textContent =
+    lvl >= 12 ? 'LEGENDARY!' : lvl >= 8 ? 'BLAZING!' : lvl >= 5 ? 'SHARP!' : 'CLEARED!';
+  document.getElementById('clearMsg').innerHTML = getClearMsg(lvl);
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  currentLevel++;
+  show('drill');
+  startLevel();
+}
+
+// ══════════════════════════════════════════════════
+// GAME OVER
+// ══════════════════════════════════════════════════
+
+function showGameOver() {
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} attempts · ${correct} correct · streak peak: ${getBestStreak()}`;
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#ffd700','#a855f7','#00f5ff','#ff006e','#00ff88'];
+  const particles = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height * 0.5,
+    vx: (Math.random() - 0.5) * 4,
+    vy: Math.random() * 3 + 1,
+    size: Math.random() * 6 + 2,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    alpha: 1, rot: Math.random() * Math.PI * 2,
+    rotv: (Math.random() - 0.5) * 0.2
+  }));
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.05;
+      p.alpha -= 0.008; p.rot += p.rotv;
+      if (p.alpha > 0) {
+        alive = true;
+        ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+        ctx.restore();
+      }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ══════════════════════════════════════════════════
+// EVENT LISTENERS
+// ══════════════════════════════════════════════════
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => show('setup'));
+document.getElementById('submitBtn').addEventListener('click', submitAnswer);
+document.getElementById('playBtn').addEventListener('click', playCurrentSequence);
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.getElementById('clear').classList.contains('active')) {
+    e.preventDefault(); proceedFromClear();
+  }
+});
+
+// init
+renderPitchMap();
+refreshBest();
+</script>
 </body>
 </html>
-```
