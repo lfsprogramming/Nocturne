@@ -186,6 +186,73 @@ body::after {
 .submit-btn:hover { background: var(--accent); color: #000; }
 .submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* ── PIANO KEYBOARD ── */
+.piano-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0; width: min(380px, 95vw); user-select: none;
+}
+.piano-row {
+  display: flex; justify-content: center;
+  width: 100%;
+}
+/* black keys row */
+.piano-row.blacks {
+  margin-bottom: -2px;
+  position: relative; z-index: 2;
+  padding: 0 calc(100% / 14); /* indent to align over white key gaps */
+}
+/* white keys row */
+.piano-row.whites { gap: 3px; }
+
+.piano-key {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border-radius: 0 0 4px 4px;
+  border: none;
+  transition: all 0.1s;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* white keys */
+.piano-key.white {
+  background: #d8d8e8;
+  color: #111;
+  font-size: 0.75rem;
+  flex: 1;
+  height: 72px;
+  border: 1px solid #444;
+}
+.piano-key.white:hover { background: #c0c0d8; }
+.piano-key.white:active, .piano-key.white.pressed { background: var(--purple); color: #fff; }
+.piano-key.white.in-pool { background: #d8d8e8; }
+.piano-key.white.not-in-pool { background: #1a1a2e; color: var(--muted); cursor: default; }
+
+/* black keys */
+.piano-key.black {
+  background: #111;
+  color: #ccc;
+  font-size: 0.65rem;
+  width: calc(100% / 7 * 0.65);
+  height: 46px;
+  margin: 0 calc(100% / 7 * 0.175);
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+}
+.piano-key.black:hover { background: #222; }
+.piano-key.black:active, .piano-key.black.pressed { background: var(--purple); color: #fff; }
+.piano-key.black.not-in-pool { background: #0a0a14; color: #2a2a3e; cursor: default; }
+
+/* spacer for missing black key (between E and F, B and C) */
+.piano-spacer {
+  width: calc(100% / 7 * 0.65);
+  margin: 0 calc(100% / 7 * 0.175);
+  display: inline-block;
+}
+
 /* feedback */
 #feedback-area { text-align: center; min-height: 50px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 #feedback-msg { font-size: 0.85rem; letter-spacing: 0.08em; min-height: 20px; }
@@ -291,6 +358,11 @@ body::after {
     <div class="answer-area">
       <div class="answer-inputs" id="answerInputs"></div>
       <button class="submit-btn" id="submitBtn" disabled>submit</button>
+      <!-- Piano keyboard -->
+      <div class="piano-wrap" id="pianoWrap">
+        <div class="piano-row blacks" id="pianoBlacks"></div>
+        <div class="piano-row whites" id="pianoWhites"></div>
+      </div>
     </div>
 
     <div id="feedback-area">
@@ -403,6 +475,7 @@ let waitingForClear = false;
 let phase = 'idle'; // 'question' | 'feedback' | 'idle'
 
 let currentSequence = [];  // array of pitch names in order
+let lastQuestionPitch = null; // last pitch of previous question, for cross-question repeat prevention
 let playIndex = 0;         // which pitch in sequence is next to play
 let audioCache = {};
 
@@ -599,6 +672,7 @@ function startLevel() {
   document.getElementById('playBtn').innerHTML = `<span class="play-icon">▶</span> ${playLabel}`;
 
   renderPool(cfg.pool);
+  renderPiano(cfg.pool);
   renderDots(cfg.seqLen);
   renderInputs(cfg.seqLen);
   updateProgressBar();
@@ -607,7 +681,7 @@ function startLevel() {
 
 function generateSequence(cfg) {
   const seq = [];
-  let last = null;
+  let last = lastQuestionPitch; // start from previous question's last pitch
   for (let i = 0; i < cfg.seqLen; i++) {
     let pick;
     let tries = 0;
@@ -625,6 +699,7 @@ function nextQuestion() {
   phase = 'question';
   const cfg = getLevelConfig(currentLevel);
   currentSequence = generateSequence(cfg);
+  lastQuestionPitch = currentSequence[currentSequence.length - 1]; // remember for next question
 
   // reset UI
   resetDots(cfg.seqLen);
@@ -813,8 +888,99 @@ function spawnParticles() {
 }
 
 // ══════════════════════════════════════════════════
-// EVENT LISTENERS
+// PIANO KEYBOARD
 // ══════════════════════════════════════════════════
+
+// Layout: 7 white keys (C D E F G A B), 5 black keys
+// Mapped to your system:
+// White keys (bottom row): go=C, du=D, no=E, va=F, je=G, za=A, be=B
+// Black keys (top row):    ma=C#, he=D#, [gap E-F], shu=F#, lo=G#, ru=A#
+// Black key positions: between keys 0-1, 1-2, gap, 3-4, 4-5, 5-6
+
+const WHITE_KEYS = [
+  { name: 'go',  note: 'C' },
+  { name: 'du',  note: 'D' },
+  { name: 'no',  note: 'E' },
+  { name: 'va',  note: 'F' },
+  { name: 'je',  note: 'G' },
+  { name: 'za',  note: 'A' },
+  { name: 'be',  note: 'B' },
+];
+
+// Black keys with position index (which gap between white keys they sit over)
+// gap 0 = between go(C) and du(D), gap 1 = du-no, gap 2 = EMPTY (E-F)
+// gap 3 = va-je, gap 4 = je-za, gap 5 = za-be
+const BLACK_KEYS = [
+  { name: 'ma',  note: 'C#', gap: 0 },
+  { name: 'he',  note: 'D#', gap: 1 },
+  null, // no black key between E and F
+  { name: 'shu', note: 'F#', gap: 3 },
+  { name: 'lo',  note: 'G#', gap: 4 },
+  { name: 'ru',  note: 'A#', gap: 5 },
+];
+
+function renderPiano(pool) {
+  const poolNames = pool.map(p => p.name);
+
+  // White keys
+  const whitesEl = document.getElementById('pianoWhites');
+  whitesEl.innerHTML = WHITE_KEYS.map(k => {
+    const inPool = poolNames.includes(k.name);
+    return `<button class="piano-key white ${inPool ? 'in-pool' : 'not-in-pool'}"
+      id="pkey-${k.name}"
+      data-pitch="${k.name}"
+      ${inPool ? '' : 'disabled'}
+    >${k.name}</button>`;
+  }).join('');
+
+  // Black keys row — 6 slots (5 keys + 1 spacer for E-F gap)
+  const blacksEl = document.getElementById('pianoBlacks');
+  blacksEl.innerHTML = BLACK_KEYS.map((k, i) => {
+    if (!k) return `<span class="piano-spacer"></span>`;
+    const inPool = poolNames.includes(k.name);
+    return `<button class="piano-key black ${inPool ? 'in-pool' : 'not-in-pool'}"
+      id="pkey-${k.name}"
+      data-pitch="${k.name}"
+      ${inPool ? '' : 'disabled'}
+    >${k.name}</button>`;
+  }).join('');
+
+  // Attach click handlers
+  document.querySelectorAll('.piano-key:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', () => handlePianoKey(btn.dataset.pitch));
+    btn.addEventListener('touchend', e => { e.preventDefault(); handlePianoKey(btn.dataset.pitch); });
+  });
+}
+
+function handlePianoKey(pitchName) {
+  if (phase !== 'question') return;
+
+  // Flash the key
+  const btn = document.getElementById('pkey-' + pitchName);
+  if (btn) {
+    btn.classList.add('pressed');
+    setTimeout(() => btn.classList.remove('pressed'), 200);
+  }
+
+  // Find the first empty input and fill it
+  const inputs = document.querySelectorAll('.pitch-input');
+  for (let i = 0; i < inputs.length; i++) {
+    if (!inputs[i].value) {
+      inputs[i].value = pitchName;
+      checkSubmitReady();
+      // If all filled, auto-submit
+      const allFilled = Array.from(inputs).every(inp => inp.value.trim().length > 0);
+      if (allFilled) setTimeout(submitAnswer, 150);
+      return;
+    }
+  }
+}
+
+function updatePianoPool(pool) {
+  renderPiano(pool);
+}
+
+
 
 document.getElementById('startBtn').addEventListener('click', startSession);
 document.getElementById('retryBtn').addEventListener('click', startSession);
@@ -832,5 +998,6 @@ document.addEventListener('keydown', e => {
 renderPitchMap();
 refreshBest();
 </script>
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
 </body>
 </html>
