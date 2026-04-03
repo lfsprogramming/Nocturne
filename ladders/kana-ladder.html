@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kana Ladder — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --sakura: #ff6b9d;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--sakura), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(255,107,157,0.4));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(255,107,157,0.3)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(255,107,157,0.7)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 28px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 140px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--sakura); }
+.setting-val { font-size: 0.75rem; color: var(--sakura); min-width: 40px; text-align: right; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--sakura); background: transparent;
+  color: var(--sakura); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--sakura); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #fff; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .val.sakura { color: var(--sakura); }
+.hud-stat .lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+#timer-bar-bg { width: 100%; height: 4px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--sakura); transition: width 0.3s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 18px; padding: 20px;
+  width: 100%; max-width: 500px; margin: 0 auto;
+}
+
+#level-badge {
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em;
+  text-transform: uppercase; text-align: center; line-height: 1.8;
+}
+
+#group-label-wrap { display: flex; align-items: center; gap: 10px; }
+#group-label {
+  font-size: 0.65rem; color: var(--sakura); letter-spacing: 0.15em;
+  text-transform: uppercase; min-height: 16px; transition: opacity 0.2s;
+}
+#toggle-hint-btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.55rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 3px 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer;
+  border-radius: 2px; transition: all 0.15s;
+}
+#toggle-hint-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* kana display */
+#kana-display {
+  font-size: clamp(5rem, 20vw, 9rem);
+  line-height: 1;
+  text-align: center;
+  color: var(--text);
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 40px rgba(255,107,157,0.2);
+  min-height: 1.2em;
+  display: flex; align-items: center; justify-content: center; gap: 0.15em;
+}
+
+#kana-display .kana-char {
+  display: inline-block;
+  transition: transform 0.1s;
+}
+
+#answer-input-wrap { display: flex; gap: 10px; align-items: center; }
+#answer-input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 1.8rem;
+  padding: 10px 16px; width: 180px; text-align: center; outline: none;
+  transition: border-color 0.15s;
+}
+#answer-input:focus { border-color: var(--sakura); }
+#answer-input.correct-flash { border-color: var(--green); }
+#answer-input.wrong-flash  { border-color: var(--danger); }
+
+#submit-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.15em;
+  padding: 10px 20px; border: 1px solid var(--sakura); background: transparent;
+  color: var(--sakura); cursor: pointer; border-radius: 4px; transition: all 0.15s;
+}
+#submit-btn:hover { background: var(--sakura); color: #fff; }
+
+#feedback-area { text-align: center; min-height: 50px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#feedback-msg { font-size: 0.85rem; letter-spacing: 0.08em; min-height: 20px; }
+.fb-ok  { color: var(--green); }
+.fb-err { color: var(--danger); }
+#correct-reveal { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--gold); letter-spacing: 0.15em; min-height: 28px; }
+
+#progress-info { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── CLEAR ── */
+#clear { gap: 12px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label { font-size: 0.75rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+.clear-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  background: linear-gradient(135deg, var(--gold), var(--sakura));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(255,107,157,0.5));
+  animation: clearpop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes clearpop { 0%{transform:scale(0.2) rotate(-5deg);opacity:0} 100%{transform:scale(1) rotate(0);opacity:1} }
+.clear-msg { font-size: 0.8rem; color: var(--text); letter-spacing: 0.08em; max-width: 340px; line-height: 1.9; }
+.clear-next { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-wrong-answer { font-size: 0.9rem; color: var(--muted); letter-spacing: 0.08em; line-height: 2; }
+.go-wrong-answer .kana-big { font-size: 2.5rem; color: var(--text); display: block; margin: 4px 0; }
+.go-wrong-answer .romaji-reveal { color: var(--gold); font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.15em; }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--sakura); color: var(--sakura); background: transparent; }
+.go-btn.primary:hover { background: var(--sakura); color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════
+     SETUP
+═══════════════════════════════════════════════════ -->
+<div id="setup" class="screen active">
+  <div class="logo">かな Ladder</div>
+  <div class="tagline">hiragana · katakana · recognition · speed</div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>time per question</label>
+      <input type="range" id="slTime" min="1" max="10" step="0.5" value="3">
+      <span class="setting-val" id="outTime">3.0s</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start climbing</button>
+
+  <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:320px;line-height:1.9;">
+    levels 1–10 · hiragana · one group each · 20 questions<br>
+    levels 11–20 · katakana · one group each · 20 questions<br>
+    levels 21–30 · two groups · 30 questions · hira then kata<br>
+    levels 31–40 · two-kana combos · 30 questions<br>
+    ん = nn always · wrong answer ends the run
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     DRILL
+═══════════════════════════════════════════════════ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val sakura" id="hudScript">hira</div><div class="lbl">Script</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">20</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-badge"></div>
+
+    <div id="group-label-wrap">
+      <div id="group-label"></div>
+      <button id="toggle-hint-btn">hide group</button>
+    </div>
+
+    <div id="kana-display"></div>
+
+    <div id="answer-input-wrap">
+      <input id="answer-input" type="text" placeholder="romaji" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="submit-btn">↵</button>
+    </div>
+
+    <div id="feedback-area">
+      <div id="feedback-msg"></div>
+      <div id="correct-reveal"></div>
+    </div>
+
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     CLEAR
+═══════════════════════════════════════════════════ -->
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title" id="clearTitle">CLEARED!</div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ tap or press space to continue</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     GAME OVER
+═══════════════════════════════════════════════════ -->
+<div id="gameover" class="screen">
+  <div class="go-title">wrong</div>
+  <div class="go-wrong-answer" id="goWrongAnswer"></div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.7rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">▶ try again</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// KANA DATA
+// ══════════════════════════════════════════════════
+
+// Each entry: { k: 'kana', r: ['primary', ...alternatives'] }
+const HIRAGANA_GROUPS = [
+  [ // 1: vowels
+    {k:'あ',r:['a']},{k:'い',r:['i']},{k:'う',r:['u']},{k:'え',r:['e']},{k:'お',r:['o']}
+  ],
+  [ // 2: ka
+    {k:'か',r:['ka']},{k:'き',r:['ki']},{k:'く',r:['ku']},{k:'け',r:['ke']},{k:'こ',r:['ko']}
+  ],
+  [ // 3: sa
+    {k:'さ',r:['sa']},{k:'し',r:['shi','si']},{k:'す',r:['su']},{k:'せ',r:['se']},{k:'そ',r:['so']}
+  ],
+  [ // 4: ta
+    {k:'た',r:['ta']},{k:'ち',r:['chi','ti']},{k:'つ',r:['tsu','tu']},{k:'て',r:['te']},{k:'と',r:['to']}
+  ],
+  [ // 5: na
+    {k:'な',r:['na']},{k:'に',r:['ni']},{k:'ぬ',r:['nu']},{k:'ね',r:['ne']},{k:'の',r:['no']}
+  ],
+  [ // 6: ha
+    {k:'は',r:['ha']},{k:'ひ',r:['hi']},{k:'ふ',r:['fu','hu']},{k:'へ',r:['he']},{k:'ほ',r:['ho']}
+  ],
+  [ // 7: ma
+    {k:'ま',r:['ma']},{k:'み',r:['mi']},{k:'む',r:['mu']},{k:'め',r:['me']},{k:'も',r:['mo']}
+  ],
+  [ // 8: ya
+    {k:'や',r:['ya']},{k:'ゆ',r:['yu']},{k:'よ',r:['yo']}
+  ],
+  [ // 9: ra
+    {k:'ら',r:['ra']},{k:'り',r:['ri']},{k:'る',r:['ru']},{k:'れ',r:['re']},{k:'ろ',r:['ro']}
+  ],
+  [ // 10: wa + n
+    {k:'わ',r:['wa']},{k:'ゐ',r:['wi']},{k:'ゑ',r:['we']},{k:'を',r:['wo']},{k:'ん',r:['nn']}
+  ],
+];
+
+const KATAKANA_GROUPS = [
+  [ // 1: vowels
+    {k:'ア',r:['a']},{k:'イ',r:['i']},{k:'ウ',r:['u']},{k:'エ',r:['e']},{k:'オ',r:['o']}
+  ],
+  [ // 2: ka
+    {k:'カ',r:['ka']},{k:'キ',r:['ki']},{k:'ク',r:['ku']},{k:'ケ',r:['ke']},{k:'コ',r:['ko']}
+  ],
+  [ // 3: sa
+    {k:'サ',r:['sa']},{k:'シ',r:['shi','si']},{k:'ス',r:['su']},{k:'セ',r:['se']},{k:'ソ',r:['so']}
+  ],
+  [ // 4: ta
+    {k:'タ',r:['ta']},{k:'チ',r:['chi','ti']},{k:'ツ',r:['tsu','tu']},{k:'テ',r:['te']},{k:'ト',r:['to']}
+  ],
+  [ // 5: na
+    {k:'ナ',r:['na']},{k:'ニ',r:['ni']},{k:'ヌ',r:['nu']},{k:'ネ',r:['ne']},{k:'ノ',r:['no']}
+  ],
+  [ // 6: ha
+    {k:'ハ',r:['ha']},{k:'ヒ',r:['hi']},{k:'フ',r:['fu','hu']},{k:'ヘ',r:['he']},{k:'ホ',r:['ho']}
+  ],
+  [ // 7: ma
+    {k:'マ',r:['ma']},{k:'ミ',r:['mi']},{k:'ム',r:['mu']},{k:'メ',r:['me']},{k:'モ',r:['mo']}
+  ],
+  [ // 8: ya
+    {k:'ヤ',r:['ya']},{k:'ユ',r:['yu']},{k:'ヨ',r:['yo']}
+  ],
+  [ // 9: ra
+    {k:'ラ',r:['ra']},{k:'リ',r:['ri']},{k:'ル',r:['ru']},{k:'レ',r:['re']},{k:'ロ',r:['ro']}
+  ],
+  [ // 10: wa + n
+    {k:'ワ',r:['wa']},{k:'ヰ',r:['wi']},{k:'ヱ',r:['we']},{k:'ヲ',r:['wo']},{k:'ン',r:['nn']}
+  ],
+];
+
+const GROUP_NAMES = ['a','ka','sa','ta','na','ha','ma','ya','ra','wa·nn'];
+
+// ══════════════════════════════════════════════════
+// LEVEL PLAN
+// Build the full 40-level sequence at session start
+// ══════════════════════════════════════════════════
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildLevelPlan() {
+  const plan = [];
+  const groupIndices = [0,1,2,3,4,5,6,7,8,9];
+
+  // Levels 1–10: hiragana, one group each, random order
+  const hiraOrder = shuffle([...groupIndices]);
+  hiraOrder.forEach(gi => {
+    plan.push({ phase: 1, script: 'hira', groups: [gi], needed: 20, seqLen: 1 });
+  });
+
+  // Levels 11–20: katakana, one group each, random order
+  const kataOrder = shuffle([...groupIndices]);
+  kataOrder.forEach(gi => {
+    plan.push({ phase: 1, script: 'kata', groups: [gi], needed: 20, seqLen: 1 });
+  });
+
+  // Levels 21–30: two groups, alternating hira/kata, each group used exactly once per script
+  // 5 hira levels + 5 kata levels, each level picks 2 groups
+  const hiraOrder2 = shuffle([...groupIndices]);
+  const kataOrder2 = shuffle([...groupIndices]);
+  for (let i = 0; i < 10; i += 2) {
+    plan.push({ phase: 2, script: 'hira', groups: [hiraOrder2[i], hiraOrder2[i+1]], needed: 30, seqLen: 1 });
+    plan.push({ phase: 2, script: 'kata', groups: [kataOrder2[i], kataOrder2[i+1]], needed: 30, seqLen: 1 });
+  }
+
+  // Levels 31–40: two-kana combos, same structure
+  const hiraOrder3 = shuffle([...groupIndices]);
+  const kataOrder3 = shuffle([...groupIndices]);
+  for (let i = 0; i < 10; i += 2) {
+    plan.push({ phase: 3, script: 'hira', groups: [hiraOrder3[i], hiraOrder3[i+1]], needed: 30, seqLen: 2 });
+    plan.push({ phase: 3, script: 'kata', groups: [kataOrder3[i], kataOrder3[i+1]], needed: 30, seqLen: 2 });
+  }
+
+  return plan;
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let startTime = 3.0;
+let levelPlan = [];
+let currentLevel = 0;
+let levelDone = 0;
+let streak = 0;
+let sessionStart = null;
+let sessionLog = [];
+let waitingForClear = false;
+let phase = 'idle';
+let showGroupHint = true;
+
+let currentKana = []; // array of kana objects for this question (len 1 or 2)
+let lastKana = null;  // to avoid consecutive repeats (single mode)
+let timerAnimFrame = null;
+let promptStart = 0;
+let totalTime = 3.0;
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('kanaBestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('kanaBestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('kanaBestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('kanaBestStreak', v); refreshBest(); }
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent  = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+}
+
+// ══════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function getPool(levelDef) {
+  const groups = levelDef.script === 'hira' ? HIRAGANA_GROUPS : KATAKANA_GROUPS;
+  let pool = [];
+  levelDef.groups.forEach(gi => pool = pool.concat(groups[gi]));
+  return pool;
+}
+
+function getGroupLabel(levelDef) {
+  const names = levelDef.groups.map(gi => GROUP_NAMES[gi]);
+  const script = levelDef.script === 'hira' ? 'hiragana' : 'katakana';
+  return `${script} · ${names.join(' + ')}`;
+}
+
+function updateProgressBar() {
+  const lv = levelPlan[currentLevel];
+  const pct = Math.min(100, Math.round(levelDone / lv.needed * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('hudDone').textContent = levelDone;
+  document.getElementById('hudNeeded').textContent = lv.needed;
+  document.getElementById('progress-info').textContent =
+    `${levelDone} / ${lv.needed} · level ${currentLevel + 1} · ${getGroupLabel(lv)}`;
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  levelPlan = buildLevelPlan();
+  lastKana = null;
+  show('drill');
+  startLevel();
+}
+
+function startLevel() {
+  levelDone = 0;
+  lastKana = null;
+  const lv = levelPlan[currentLevel];
+  totalTime = startTime;
+
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudScript').textContent = lv.script === 'hira' ? 'hira' : 'kata';
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('level-badge').textContent =
+    `level ${currentLevel + 1} · phase ${lv.phase} · ${lv.seqLen === 2 ? '2-kana combos' : 'single kana'}`;
+  document.getElementById('group-label').textContent =
+    showGroupHint ? getGroupLabel(lv) : '';
+
+  updateProgressBar();
+  nextQuestion();
+}
+
+function generateQuestion() {
+  const lv = levelPlan[currentLevel];
+  const pool = getPool(lv);
+
+  if (lv.seqLen === 1) {
+    // single kana, no consecutive repeat
+    let pick, tries = 0;
+    do {
+      pick = pool[Math.floor(Math.random() * pool.length)];
+      tries++;
+    } while (lastKana && pick.k === lastKana.k && pool.length > 1 && tries < 20);
+    lastKana = pick;
+    return [pick];
+  } else {
+    // two kana combo, no same kana twice in a row between questions
+    let a, b, tries = 0;
+    do {
+      a = pool[Math.floor(Math.random() * pool.length)];
+      b = pool[Math.floor(Math.random() * pool.length)];
+      tries++;
+    } while (tries < 20 && lastKana && a.k === lastKana.k);
+    lastKana = a;
+    return [a, b];
+  }
+}
+
+function nextQuestion() {
+  phase = 'question';
+  clearTimers();
+  currentKana = generateQuestion();
+
+  // render kana
+  document.getElementById('kana-display').innerHTML =
+    currentKana.map(k => `<span class="kana-char">${k.k}</span>`).join('');
+
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = '';
+  document.getElementById('correct-reveal').textContent = '';
+  document.getElementById('answer-input').value = '';
+  document.getElementById('answer-input').className = '';
+  document.getElementById('answer-input').focus();
+  updateProgressBar();
+
+  promptStart = performance.now();
+  startTimer();
+}
+
+function getCorrectRomaji() {
+  // For single: just the romaji. For combo: concatenated primary romaji.
+  return currentKana.map(k => k.r[0]).join('');
+}
+
+function isAnswerCorrect(userInput) {
+  const input = userInput.toLowerCase().trim();
+  if (currentKana.length === 1) {
+    return currentKana[0].r.includes(input);
+  } else {
+    // for combos, build all combinations of accepted romaji
+    const optionsA = currentKana[0].r;
+    const optionsB = currentKana[1].r;
+    for (const a of optionsA) {
+      for (const b of optionsB) {
+        if (input === a + b) return true;
+      }
+    }
+    return false;
+  }
+}
+
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  function tick() {
+    const elapsed = (performance.now() - promptStart) / 1000;
+    const timeLeft = Math.max(0, totalTime - elapsed);
+    const pct = timeLeft / totalTime;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    if (timeLeft > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else handleWrong(true);
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+function submitAnswer() {
+  if (phase !== 'question') return;
+  const raw = document.getElementById('answer-input').value;
+  if (!raw.trim()) return;
+
+  clearTimers();
+  phase = 'feedback';
+
+  const correct = isAnswerCorrect(raw);
+  const responseMs = Math.round(performance.now() - promptStart);
+
+  sessionLog.push({
+    level: currentLevel + 1,
+    kana: currentKana.map(k => k.k).join(''),
+    correct_answer: getCorrectRomaji(),
+    user_answer: raw.trim().toLowerCase(),
+    correct,
+    response_ms: responseMs,
+  });
+
+  if (correct) {
+    streak++;
+    levelDone++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('hudStreak').textContent = streak;
+    document.getElementById('answer-input').classList.add('correct-flash');
+    document.getElementById('feedback-msg').textContent = '';
+    updateProgressBar();
+
+    const lv = levelPlan[currentLevel];
+    if (levelDone >= lv.needed) {
+      setTimeout(showClear, 300);
+    } else {
+      setTimeout(nextQuestion, 350);
+    }
+  } else {
+    handleWrong(false, raw);
+  }
+}
+
+function handleWrong(timeout, userInput) {
+  if (phase === 'idle') return;
+  phase = 'feedback';
+  clearTimers();
+  streak = 0;
+  document.getElementById('hudStreak').textContent = 0;
+  document.getElementById('timer-bar').style.width = '0%';
+
+  const correctRomaji = getCorrectRomaji();
+  const kanaStr = currentKana.map(k => k.k).join('');
+
+  document.getElementById('answer-input').classList.add('wrong-flash');
+  document.getElementById('feedback-msg').textContent = timeout ? 'too slow' : 'wrong';
+  document.getElementById('feedback-msg').className = timeout ? 'fb-err' : 'fb-err';
+  document.getElementById('correct-reveal').textContent = `${kanaStr} = ${correctRomaji}`;
+
+  setTimeout(() => showGameOver(kanaStr, correctRomaji, userInput), 2200);
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════
+
+const CLEAR_MESSAGES = [
+  // Phase 1 hira (1-10)
+  "One hiragana group down. Nine to go.",
+  "Two groups. Your eye is calibrating.",
+  "Three hiragana groups. Halfway through the first phase.",
+  "Four groups. The shapes are becoming familiar.",
+  "Five hiragana groups complete.",
+  "Six groups. More than half the syllabary.",
+  "Seven hiragana groups. Almost there.",
+  "Eight groups. The rare ones are in your sight.",
+  "Nine hiragana groups. One left.",
+  "All hiragana groups cleared. Katakana begins.",
+  // Phase 1 kata (11-20)
+  "First katakana group. Same sounds, new shapes.",
+  "Two katakana groups. Finding the angular logic.",
+  "Three katakana groups.",
+  "Four groups. The pattern is emerging.",
+  "Five katakana groups.",
+  "Six groups. More than halfway.",
+  "Seven katakana groups.",
+  "Eight groups. Almost through.",
+  "Nine katakana groups. One left.",
+  "All katakana groups cleared. Phase 2 begins — two groups at once.",
+  // Phase 2 (21-30)
+  "Two hiragana groups combined. Your recognition field is expanding.",
+  "Two katakana groups combined.",
+  "More groups. The full syllabary is in reach.",
+  "Katakana pairs. Sharp and fast.",
+  "Halfway through phase 2.",
+  "Katakana pairs. Your eye is quick now.",
+  "Phase 2 nearly complete.",
+  "Almost there.",
+  "One more phase 2 level.",
+  "Phase 2 complete. Phase 3 begins — two kana, one answer.",
+  // Phase 3 (31-40)
+  "Two-kana combos. Hold both shapes, speak one word.",
+  "Katakana combos. Angular and fast.",
+  "More pairs. The combinations are becoming automatic.",
+  "Katakana combo pairs.",
+  "Halfway through phase 3.",
+  "Katakana. Speed is the only goal now.",
+  "Phase 3 nearly complete.",
+  "Almost legendary.",
+  "One level left.",
+  "Complete. All 40 levels. Kana mastery.",
+];
+
+function showClear() {
+  const lvl = currentLevel + 1;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `Level ${lvl} complete`;
+  document.getElementById('clearTitle').textContent =
+    lvl >= 35 ? 'LEGENDARY!' : lvl >= 25 ? 'BLAZING!' : lvl >= 15 ? 'SHARP!' : 'CLEARED!';
+  document.getElementById('clearMsg').textContent =
+    CLEAR_MESSAGES[Math.min(lvl - 1, CLEAR_MESSAGES.length - 1)];
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  currentLevel++;
+  if (currentLevel >= levelPlan.length) {
+    // all 40 levels done — loop or stop
+    currentLevel = levelPlan.length - 1;
+    showGameOver('', '', '');
+    return;
+  }
+  show('drill');
+  startLevel();
+}
+
+// ══════════════════════════════════════════════════
+// GAME OVER
+// ══════════════════════════════════════════════════
+
+function showGameOver(kanaStr, correctRomaji, userInput) {
+  phase = 'idle';
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+
+  let wrongHtml = '';
+  if (kanaStr) {
+    wrongHtml = `
+      <span class="kana-big">${kanaStr}</span>
+      <span class="romaji-reveal">${correctRomaji}</span>
+      ${userInput ? `<br><span style="color:var(--muted);font-size:0.7rem;">you typed: ${userInput.toLowerCase()}</span>` : ''}
+    `;
+  }
+  document.getElementById('goWrongAnswer').innerHTML = wrongHtml;
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} attempts · ${correct} correct · streak peak: ${getBestStreak()}`;
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#ffd700','#ff6b9d','#00f5ff','#ff006e','#00ff88'];
+  const particles = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height * 0.5,
+    vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3 + 1,
+    size: Math.random() * 6 + 2, color: colors[Math.floor(Math.random() * colors.length)],
+    alpha: 1, rot: Math.random() * Math.PI * 2, rotv: (Math.random() - 0.5) * 0.2
+  }));
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); let alive = false;
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.alpha -= 0.008; p.rot += p.rotv;
+      if (p.alpha > 0) {
+        alive = true; ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); ctx.restore();
+      }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('slTime').addEventListener('input', function() {
+  startTime = parseFloat(this.value);
+  document.getElementById('outTime').textContent = startTime.toFixed(1) + 's';
+});
+
+document.getElementById('toggle-hint-btn').addEventListener('click', function() {
+  showGroupHint = !showGroupHint;
+  this.textContent = showGroupHint ? 'hide group' : 'show group';
+  const lv = levelPlan[currentLevel];
+  document.getElementById('group-label').textContent =
+    showGroupHint && lv ? getGroupLabel(lv) : '';
+});
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => { clearTimers(); show('setup'); });
+document.getElementById('submit-btn').addEventListener('click', submitAnswer);
+document.getElementById('answer-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitAnswer();
+});
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.getElementById('clear').addEventListener('touchend', e => { e.preventDefault(); proceedFromClear(); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.getElementById('clear').classList.contains('active')) {
+    e.preventDefault(); proceedFromClear();
+  }
+});
+
+// init
+refreshBest();
+</script>
+</body>
+</html>
