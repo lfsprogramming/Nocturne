@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Digital Root — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --teal: #00c9a7;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--teal), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(0,201,167,0.4));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(0,201,167,0.3)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(0,201,167,0.7)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 28px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 140px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--teal); }
+.setting-val { font-size: 0.75rem; color: var(--teal); min-width: 40px; text-align: right; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--teal); background: transparent;
+  color: var(--teal); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--teal); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .val.teal { color: var(--teal); }
+.hud-stat .lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+#timer-bar-bg { width: 100%; height: 4px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--teal); transition: width 0.3s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px; padding: 20px;
+  width: 100%; max-width: 500px; margin: 0 auto;
+}
+
+#level-badge { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; line-height: 1.8; }
+
+#number-display {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(3rem, 14vw, 7rem);
+  color: var(--text);
+  letter-spacing: 0.12em;
+  text-align: center;
+  line-height: 1;
+  text-shadow: 0 0 40px rgba(0,201,167,0.15);
+}
+
+/* digit buttons 1-9 in 3x3 grid */
+.digit-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: min(240px, 80vw);
+}
+.digit-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  letter-spacing: 0.1em;
+  padding: 14px 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.digit-btn:hover { border-color: var(--teal); color: var(--teal); background: rgba(0,201,167,0.06); }
+.digit-btn:active, .digit-btn.pressed { background: var(--teal); color: #000; border-color: var(--teal); }
+
+#answer-input-wrap { display: flex; gap: 10px; align-items: center; }
+#answer-input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 1.8rem;
+  padding: 10px 16px; width: 100px; text-align: center; outline: none;
+  transition: border-color 0.15s;
+}
+#answer-input:focus { border-color: var(--teal); }
+
+#feedback-area { text-align: center; min-height: 50px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#feedback-msg { font-size: 0.85rem; letter-spacing: 0.08em; min-height: 20px; }
+.fb-ok  { color: var(--green); }
+.fb-err { color: var(--danger); }
+#correct-reveal { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--gold); letter-spacing: 0.15em; min-height: 28px; }
+
+#progress-info { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── PAUSE ── */
+#pause {
+  gap: 20px; text-align: center; background: rgba(5,5,8,0.97);
+  backdrop-filter: blur(4px);
+}
+.pause-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 6rem); color: var(--teal); letter-spacing: 0.2em; }
+.pause-sub { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
+.pause-stats { display: flex; gap: 28px; justify-content: center; }
+.pause-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pause-stat .pval { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--gold); line-height: 1; }
+.pause-stat .plbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+.resume-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.2em;
+  padding: 12px 40px; border: 2px solid var(--teal); background: transparent;
+  color: var(--teal); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+}
+.resume-btn:hover { background: var(--teal); color: #000; }
+
+/* ── CLEAR ── */
+#clear { gap: 12px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label { font-size: 0.75rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+.clear-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  background: linear-gradient(135deg, var(--gold), var(--teal));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(0,201,167,0.5));
+  animation: clearpop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes clearpop { 0%{transform:scale(0.2) rotate(-5deg);opacity:0} 100%{transform:scale(1) rotate(0);opacity:1} }
+.clear-msg { font-size: 0.8rem; color: var(--text); letter-spacing: 0.08em; max-width: 320px; line-height: 1.9; }
+.clear-next { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup" class="screen active">
+  <div class="logo">Digital Root</div>
+  <div class="tagline">sum digits to single digit · speed ladder</div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>time per question</label>
+      <input type="range" id="slTime" min="1" max="10" step="0.5" value="3">
+      <span class="setting-val" id="outTime">3.0s</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start climbing</button>
+
+  <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:320px;line-height:1.9;">
+    level 1 · 2-digit · full range · 10 questions<br>
+    levels 2–4 · 3-digit · range expands · +2 questions<br>
+    levels 5–7 · 3-digit · full range · 95% time each<br>
+    levels 8–10 · 4-digit · range expands · time resets<br>
+    and so on · press ESC to pause
+  </div>
+</div>
+
+<!-- DRILL -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val teal" id="hudDigits">2</div><div class="lbl">Digits</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">10</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-badge"></div>
+    <div id="number-display"></div>
+
+    <div id="answer-input-wrap">
+      <input id="answer-input" type="number" min="1" max="9" placeholder="?" autocomplete="off">
+    </div>
+
+    <div class="digit-pad" id="digitPad"></div>
+
+    <div id="feedback-area">
+      <div id="feedback-msg"></div>
+      <div id="correct-reveal"></div>
+    </div>
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div id="pause" class="screen">
+  <div class="pause-title">paused</div>
+  <div class="pause-stats">
+    <div class="pause-stat"><div class="pval" id="pauseLevel">1</div><div class="plbl">Level</div></div>
+    <div class="pause-stat"><div class="pval" id="pauseDone">0</div><div class="plbl">Done</div></div>
+    <div class="pause-stat"><div class="pval" id="pauseStreak">0</div><div class="plbl">Streak</div></div>
+  </div>
+  <div class="pause-sub">press ESC or tap to resume</div>
+  <button class="resume-btn" id="resumeBtn">▶ resume</button>
+</div>
+
+<!-- CLEAR -->
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title" id="clearTitle">CLEARED!</div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ tap or press space to continue</div>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover" class="screen">
+  <div class="go-title">game over</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.7rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">▶ try again</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// LEVEL CONFIG
+// ══════════════════════════════════════════════════
+
+// Structure per "tier" (2-digit, 3-digit, 4-digit, 5-digit...):
+//   - intro level: restricted digits (1-4), base time, baseQuestions
+//   - mid level:   restricted digits (1-6), base time, baseQuestions+2
+//   - full level:  all digits (1-9, +zeros), base time, baseQuestions+4
+//   - speed1:      all digits, 95% time, same questions
+//   - speed2:      all digits, 95%^2 time, same questions
+//   - speed3:      all digits, 95%^3 time, same questions
+// Exception: 2-digit tier only has one level (full range, no speed)
+
+// baseQuestions climbs: 2-digit=10, then +2 per level within tiers
+// We track a global question counter that keeps climbing
+
+let startTime = 3.0;
+
+function buildLevelList() {
+  const levels = [];
+  let qCount = 10; // starts at 10 for level 1
+
+  // Level 1: 2-digit, full range (1-9), no zeros, base time
+  levels.push({ digits: 2, maxDigit: 9, zeros: false, timeScale: 1.0, needed: qCount, desc: '2-digit · 1–9' });
+  qCount += 2;
+
+  // Tiers for 3, 4, 5, 6 digits
+  for (let d = 3; d <= 6; d++) {
+    // intro (1-4)
+    levels.push({ digits: d, maxDigit: 4, zeros: false, timeScale: 1.0, needed: qCount, desc: `${d}-digit · 1–4`, resetTime: true });
+    qCount += 2;
+    // mid (1-6)
+    levels.push({ digits: d, maxDigit: 6, zeros: false, timeScale: 1.0, needed: qCount, desc: `${d}-digit · 1–6` });
+    qCount += 2;
+    // full (1-9 + zeros)
+    levels.push({ digits: d, maxDigit: 9, zeros: true, timeScale: 1.0, needed: qCount, desc: `${d}-digit · 1–9` });
+    // speed x3 (time keeps from previous tier's speed if applicable, resets on digit expansion)
+    levels.push({ digits: d, maxDigit: 9, zeros: true, timeScale: 0.95,         needed: qCount, desc: `${d}-digit · speed ×1` });
+    levels.push({ digits: d, maxDigit: 9, zeros: true, timeScale: 0.95**2,      needed: qCount, desc: `${d}-digit · speed ×2` });
+    levels.push({ digits: d, maxDigit: 9, zeros: true, timeScale: 0.95**3,      needed: qCount, desc: `${d}-digit · speed ×3` });
+    qCount += 2;
+  }
+
+  return levels;
+}
+
+const LEVELS = buildLevelList();
+
+function getTimeForLevel(levelIndex) {
+  const lv = LEVELS[levelIndex];
+  return startTime * lv.timeScale;
+}
+
+// ══════════════════════════════════════════════════
+// DIGITAL ROOT
+// ══════════════════════════════════════════════════
+
+function digitalRoot(n) {
+  if (n === 0) return 0;
+  const r = n % 9;
+  return r === 0 ? 9 : r;
+}
+
+function generateNumber(lv) {
+  let digits = [];
+  for (let i = 0; i < lv.digits; i++) {
+    // zero chance: only on full range levels, 1/25 per digit, not leading digit
+    if (lv.zeros && i > 0 && Math.random() < 1/25) {
+      digits.push(0);
+    } else {
+      digits.push(Math.floor(Math.random() * lv.maxDigit) + 1);
+    }
+  }
+  return parseInt(digits.join(''));
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let currentLevel = 0;
+let levelDone = 0;
+let streak = 0;
+let sessionStart = null;
+let sessionLog = [];
+let waitingForClear = false;
+let phase = 'idle';
+let isPaused = false;
+let pausedTimeLeft = 0;
+
+let currentNumber = 0;
+let timerAnimFrame = null;
+let promptStart = 0;
+let totalTime = 3.0;
+let pauseStart = 0;
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('drBestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('drBestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('drBestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('drBestStreak', v); refreshBest(); }
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent  = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+}
+
+// ══════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','pause','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function buildDigitPad() {
+  const pad = document.getElementById('digitPad');
+  pad.innerHTML = [1,2,3,4,5,6,7,8,9].map(d =>
+    `<button class="digit-btn" data-digit="${d}">${d}</button>`
+  ).join('');
+  pad.querySelectorAll('.digit-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleDigitBtn(parseInt(btn.dataset.digit)));
+    btn.addEventListener('touchend', e => { e.preventDefault(); handleDigitBtn(parseInt(btn.dataset.digit)); });
+  });
+}
+
+function handleDigitBtn(digit) {
+  if (phase !== 'question' || isPaused) return;
+  const btn = document.querySelector(`.digit-btn[data-digit="${digit}"]`);
+  if (btn) { btn.classList.add('pressed'); setTimeout(() => btn.classList.remove('pressed'), 150); }
+  submitDigit(digit);
+}
+
+function updateProgressBar() {
+  const lv = LEVELS[currentLevel];
+  const pct = Math.min(100, Math.round(levelDone / lv.needed * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('hudDone').textContent = levelDone;
+  document.getElementById('hudNeeded').textContent = lv.needed;
+  document.getElementById('progress-info').textContent =
+    `${levelDone} / ${lv.needed} · level ${currentLevel + 1} · ${lv.desc} · ${totalTime.toFixed(2)}s`;
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  show('drill');
+  startLevel();
+}
+
+function startLevel() {
+  levelDone = 0;
+  const lv = LEVELS[currentLevel];
+  totalTime = getTimeForLevel(currentLevel);
+
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudDigits').textContent = lv.digits;
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('level-badge').textContent =
+    `level ${currentLevel + 1} · ${lv.desc} · ${totalTime.toFixed(2)}s`;
+
+  updateProgressBar();
+  nextQuestion();
+}
+
+function nextQuestion() {
+  phase = 'question';
+  clearTimers();
+  const lv = LEVELS[currentLevel];
+  currentNumber = generateNumber(lv);
+
+  document.getElementById('number-display').textContent = currentNumber;
+  document.getElementById('answer-input').value = '';
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = '';
+  document.getElementById('correct-reveal').textContent = '';
+  document.getElementById('answer-input').focus();
+  updateProgressBar();
+
+  promptStart = performance.now();
+  startTimer();
+}
+
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  function tick() {
+    if (isPaused) return;
+    const elapsed = (performance.now() - promptStart) / 1000;
+    const timeLeft = Math.max(0, totalTime - elapsed);
+    const pct = timeLeft / totalTime;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    if (timeLeft > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else handleWrong(true);
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+function submitDigit(digit) {
+  if (phase !== 'question') return;
+  checkAnswer(digit);
+}
+
+function submitFromInput() {
+  if (phase !== 'question') return;
+  const raw = document.getElementById('answer-input').value.trim();
+  if (!raw) return;
+  const digit = parseInt(raw);
+  if (isNaN(digit) || digit < 1 || digit > 9) return;
+  document.getElementById('answer-input').value = '';
+  checkAnswer(digit);
+}
+
+function checkAnswer(userDigit) {
+  const correct = digitalRoot(currentNumber);
+  const responseMs = Math.round(performance.now() - promptStart);
+  const isCorrect = userDigit === correct;
+
+  clearTimers();
+  phase = 'feedback';
+
+  sessionLog.push({
+    level: currentLevel + 1,
+    number: currentNumber,
+    correct_answer: correct,
+    user_answer: userDigit,
+    correct: isCorrect,
+    response_ms: responseMs,
+  });
+
+  if (isCorrect) {
+    streak++;
+    levelDone++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('hudStreak').textContent = streak;
+    document.getElementById('feedback-msg').textContent = 'correct';
+    document.getElementById('feedback-msg').className = 'fb-ok';
+    document.getElementById('correct-reveal').textContent = '';
+    updateProgressBar();
+
+    const lv = LEVELS[currentLevel];
+    if (levelDone >= lv.needed) {
+      setTimeout(showClear, 400);
+    } else {
+      setTimeout(nextQuestion, 450);
+    }
+  } else {
+    handleWrong(false, userDigit);
+  }
+}
+
+function handleWrong(timeout, userDigit) {
+  if (phase === 'idle') return;
+  phase = 'feedback';
+  clearTimers();
+  streak = 0;
+  document.getElementById('hudStreak').textContent = 0;
+  document.getElementById('timer-bar').style.width = '0%';
+
+  const correct = digitalRoot(currentNumber);
+  document.getElementById('feedback-msg').textContent = timeout ? 'too slow' : 'wrong';
+  document.getElementById('feedback-msg').className = 'fb-err';
+  document.getElementById('correct-reveal').textContent = `${currentNumber} → ${correct}`;
+
+  setTimeout(showGameOver, 2200);
+}
+
+// ══════════════════════════════════════════════════
+// PAUSE
+// ══════════════════════════════════════════════════
+
+function pauseGame() {
+  if (phase !== 'question' || isPaused) return;
+  isPaused = true;
+  pauseStart = performance.now();
+  clearTimers();
+  document.getElementById('pauseLevel').textContent = currentLevel + 1;
+  document.getElementById('pauseDone').textContent = levelDone;
+  document.getElementById('pauseStreak').textContent = streak;
+  show('pause');
+}
+
+function resumeGame() {
+  if (!isPaused) return;
+  isPaused = false;
+  // Adjust promptStart to account for paused time
+  const pausedDuration = performance.now() - pauseStart;
+  promptStart += pausedDuration;
+  show('drill');
+  startTimer();
+  document.getElementById('answer-input').focus();
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════
+
+const CLEAR_MESSAGES = [
+  "2-digit roots. The foundation is set.",
+  "3-digit with small digits. Your digit sum instinct is waking up.",
+  "Mid-range digits. The sums are getting heavier.",
+  "Full 3-digit range. Zeros in the mix now.",
+  "Speed begins. 5% faster.",
+  "Faster still. Your mental arithmetic is compressing.",
+  "3-digit mastery. 4-digit begins.",
+  "4-digit with small digits. New territory.",
+  "Mid-range 4-digit. Your working memory is stretching.",
+  "Full 4-digit range. The zeros keep you honest.",
+  "4-digit speed. The clock is tightening.",
+  "Faster. No hesitation.",
+  "4-digit mastery. 5-digit begins.",
+  "5-digit. This is rare territory.",
+  "Mid-range 5-digit. Exceptional.",
+  "Full 5-digit range. Elite.",
+  "5-digit speed. Legendary.",
+];
+
+function getClearMsg(lvl) {
+  return CLEAR_MESSAGES[Math.min(lvl - 1, CLEAR_MESSAGES.length - 1)] || `Level ${lvl} complete. Keep climbing.`;
+}
+
+function showClear() {
+  const lvl = currentLevel + 1;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `Level ${lvl} complete`;
+  document.getElementById('clearTitle').textContent =
+    lvl >= 14 ? 'LEGENDARY!' : lvl >= 8 ? 'BLAZING!' : lvl >= 4 ? 'SHARP!' : 'CLEARED!';
+  document.getElementById('clearMsg').textContent = getClearMsg(lvl);
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  currentLevel++;
+  if (currentLevel >= LEVELS.length) currentLevel = LEVELS.length - 1;
+  show('drill');
+  startLevel();
+}
+
+// ══════════════════════════════════════════════════
+// GAME OVER
+// ══════════════════════════════════════════════════
+
+function showGameOver() {
+  phase = 'idle';
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} attempts · ${correct} correct · streak peak: ${getBestStreak()}`;
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#ffd700','#00c9a7','#00f5ff','#ff006e','#00ff88'];
+  const particles = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height * 0.5,
+    vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3 + 1,
+    size: Math.random() * 6 + 2, color: colors[Math.floor(Math.random() * colors.length)],
+    alpha: 1, rot: Math.random() * Math.PI * 2, rotv: (Math.random() - 0.5) * 0.2
+  }));
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); let alive = false;
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.alpha -= 0.008; p.rot += p.rotv;
+      if (p.alpha > 0) {
+        alive = true; ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); ctx.restore();
+      }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('slTime').addEventListener('input', function() {
+  startTime = parseFloat(this.value);
+  document.getElementById('outTime').textContent = startTime.toFixed(1) + 's';
+});
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => { clearTimers(); show('setup'); });
+document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+document.getElementById('pause').addEventListener('click', resumeGame);
+
+document.getElementById('answer-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitFromInput();
+});
+document.getElementById('answer-input').addEventListener('input', function() {
+  // Auto-submit on single digit entry
+  const val = this.value.trim();
+  if (val.length === 1 && val >= '1' && val <= '9') {
+    setTimeout(() => { submitFromInput(); }, 50);
+  }
+});
+
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.getElementById('clear').addEventListener('touchend', e => { e.preventDefault(); proceedFromClear(); });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('drill').classList.contains('active') && phase === 'question') {
+      pauseGame();
+    } else if (document.getElementById('pause').classList.contains('active')) {
+      resumeGame();
+    }
+  }
+  if (e.code === 'Space' && document.getElementById('clear').classList.contains('active')) {
+    e.preventDefault(); proceedFromClear();
+  }
+});
+
+// init
+buildDigitPad();
+refreshBest();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
