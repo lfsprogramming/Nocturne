@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Manga Checklist — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --sakura: #ff6b9d;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+/* ── HEADER ── */
+.page-header {
+  padding: 40px 28px 20px;
+  border-bottom: 1px solid var(--border);
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 80%);
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--sakura), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 16px rgba(255,107,157,0.3));
+}
+
+.tagline {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* ── PANEL COUNTER ── */
+.panel-counter-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px 0;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.panel-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.panel-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.5rem;
+  color: var(--gold);
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+.next-panel-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.15em;
+  padding: 10px 24px;
+  border: 1px solid var(--sakura);
+  background: transparent;
+  color: var(--sakura);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+.next-panel-btn:hover { background: var(--sakura); color: #fff; }
+
+/* ── CHECKLIST ── */
+.checklist-wrap {
+  flex: 1;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 20px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.section-title {
+  font-size: 0.55rem;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.item:hover { border-color: var(--border); background: var(--surface); }
+.item.checked { border-color: rgba(0,255,136,0.15); background: rgba(0,255,136,0.04); }
+
+.checkbox {
+  width: 18px; height: 18px; min-width: 18px;
+  border: 1px solid var(--muted);
+  border-radius: 2px;
+  margin-top: 2px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.item.checked .checkbox {
+  background: var(--green);
+  border-color: var(--green);
+}
+.checkmark {
+  display: none;
+  color: #000;
+  font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1;
+}
+.item.checked .checkmark { display: block; }
+
+.item-text { display: flex; flex-direction: column; gap: 3px; }
+
+.item-label {
+  font-size: 0.85rem;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  transition: color 0.15s;
+}
+.item.checked .item-label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--muted); }
+
+.item-sub {
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+}
+
+/* ── FOOTER CONTROLS ── */
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 28px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.reset-btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.reset-btn:hover { color: var(--text); border-color: var(--muted); }
+
+.back-btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: 6px 0;
+  cursor: pointer;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+.back-btn:hover { color: var(--text); }
+
+.progress-indicator {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.progress-indicator span { color: var(--green); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="logo">Manga Checklist</div>
+  <div class="tagline">panel-by-panel active reading · One Piece</div>
+</div>
+
+<div class="panel-counter-wrap">
+  <div>
+    <div class="panel-label">current panel</div>
+    <div class="panel-num" id="panelNum">1</div>
+  </div>
+  <button class="next-panel-btn" id="nextPanelBtn">next panel ▶</button>
+</div>
+
+<div class="checklist-wrap">
+
+  <!-- PER PANEL -->
+  <div class="section">
+    <div class="section-title">per panel</div>
+
+    <div class="item panel-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Scan all bubbles — note anything you recognise</div>
+        <div class="item-sub">Don't look anything up yet</div>
+      </div>
+    </div>
+
+    <div class="item panel-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Hover unknown words with Yomitan</div>
+        <div class="item-sub">Read furigana aloud, then play audio and repeat it</div>
+      </div>
+    </div>
+
+    <div class="item panel-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Re-read each bubble — does the sentence make sense?</div>
+        <div class="item-sub">If not, paste into Google Translate</div>
+      </div>
+    </div>
+
+    <div class="item panel-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Look away — recall what happened in broken Japanese</div>
+        <div class="item-sub">Even just 2–3 words. Don't skip this.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- END OF PAGE -->
+  <div class="section">
+    <div class="section-title">end of page</div>
+
+    <div class="item page-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Re-read the whole page</div>
+        <div class="item-sub">Look up only words critical to meaning you forgot</div>
+      </div>
+    </div>
+
+    <div class="item page-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Write down 3 words that stuck out</div>
+        <div class="item-sub">Funny, confusing, or appeared twice — add to your text file</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- END OF CHAPTER -->
+  <div class="section">
+    <div class="section-title">end of chapter</div>
+
+    <div class="item chapter-item" onclick="toggle(this)">
+      <div class="checkbox"><span class="checkmark">✓</span></div>
+      <div class="item-text">
+        <div class="item-label">Re-read the entire chapter</div>
+        <div class="item-sub">Second pass — you half-know it now</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="controls">
+  <a href="../japanese.html" class="back-btn">← japanese</a>
+  <div class="progress-indicator" id="progressIndicator"></div>
+  <button class="reset-btn" id="resetBtn">↺ reset all</button>
+</div>
+
+<script>
+let panelCount = 1;
+const totalItems = document.querySelectorAll('.item').length;
+
+function toggle(el) {
+  el.classList.toggle('checked');
+  updateProgress();
+}
+
+function updateProgress() {
+  const checked = document.querySelectorAll('.item.checked').length;
+  const el = document.getElementById('progressIndicator');
+  el.innerHTML = `<span>${checked}</span> / ${totalItems}`;
+}
+
+function nextPanel() {
+  // Reset only per-panel items
+  document.querySelectorAll('.panel-item').forEach(el => el.classList.remove('checked'));
+  panelCount++;
+  document.getElementById('panelNum').textContent = panelCount;
+  updateProgress();
+  // Scroll back to top of checklist
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetAll() {
+  document.querySelectorAll('.item').forEach(el => el.classList.remove('checked'));
+  panelCount = 1;
+  document.getElementById('panelNum').textContent = '1';
+  updateProgress();
+}
+
+document.getElementById('nextPanelBtn').addEventListener('click', nextPanel);
+document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+// init
+updateProgress();
+</script>
+
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
