@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Knight Pathfinder — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --ivory: #e8d5a3;
+  --text: #e8e8f0;
+  --muted: #404060;
+
+  /* board colors */
+  --sq-light: #c9b07a;
+  --sq-dark:  #6b4f2a;
+  --sq-knight: #00f5ff;
+  --sq-target: #ff006e;
+  --sq-valid:  rgba(0,255,136,0.35);
+  --sq-visited: rgba(255,0,60,0.4);
+  --sq-optimal: rgba(255,215,0,0.5);
+  --sq-path-line: rgba(255,215,0,0.8);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--ivory), var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(255,215,0,0.3));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(255,215,0,0.2)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(255,215,0,0.5)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 60px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 150px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--gold); }
+.setting-val { font-size: 0.75rem; color: var(--gold); min-width: 44px; text-align: right; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--gold); background: transparent;
+  color: var(--gold); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--gold); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 44px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl { font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+
+#timer-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 2px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--gold); transition: width 0.3s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px; padding: 12px;
+  width: 100%;
+}
+
+#level-badge { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; }
+
+/* ── BOARD ── */
+.board-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-with-coords {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.rank-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.rank-label {
+  font-size: 0.5rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+}
+
+.file-labels {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  padding-left: 14px;
+}
+
+.file-label {
+  font-size: 0.5rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0;
+  border: 2px solid #2a2a1a;
+  box-shadow: 0 0 40px rgba(255,215,0,0.08), 0 0 0 1px rgba(255,215,0,0.05);
+}
+
+.sq {
+  width: clamp(36px, 10vw, 60px);
+  height: clamp(36px, 10vw, 60px);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  cursor: default;
+  transition: background 0.1s;
+  font-size: clamp(20px, 5.5vw, 36px);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sq.light { background: var(--sq-light); }
+.sq.dark  { background: var(--sq-dark); }
+
+.sq.knight-pos {
+  background: var(--sq-knight) !important;
+  box-shadow: inset 0 0 12px rgba(0,245,255,0.5);
+  cursor: default;
+}
+
+.sq.target-pos {
+  background: var(--sq-target) !important;
+  box-shadow: inset 0 0 12px rgba(255,0,110,0.5);
+  animation: targetpulse 1.2s ease-in-out infinite;
+}
+@keyframes targetpulse {
+  0%,100% { box-shadow: inset 0 0 12px rgba(255,0,110,0.4); }
+  50%      { box-shadow: inset 0 0 24px rgba(255,0,110,0.8); }
+}
+
+.sq.valid-move {
+  cursor: pointer;
+}
+.sq.valid-move::after {
+  content: '';
+  position: absolute;
+  width: 38%;
+  height: 38%;
+  border-radius: 50%;
+  background: var(--green);
+  opacity: 0.7;
+  box-shadow: 0 0 8px var(--green);
+}
+.sq.valid-move:hover { filter: brightness(1.2); }
+
+.sq.visited {
+  background: rgba(255,0,60,0.35) !important;
+}
+
+.sq.optimal-path {
+  background: rgba(255,215,0,0.4) !important;
+  box-shadow: inset 0 0 10px rgba(255,215,0,0.3);
+}
+
+/* move number labels on path */
+.sq .move-label {
+  position: absolute;
+  top: 2px; left: 3px;
+  font-size: 0.5rem;
+  color: var(--gold);
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── STATUS MESSAGES ── */
+#status-area {
+  text-align: center;
+  min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+#status-msg {
+  font-size: 0.8rem; letter-spacing: 0.1em; min-height: 18px;
+  text-transform: uppercase;
+}
+.s-ok    { color: var(--green); }
+.s-err   { color: var(--danger); }
+.s-info  { color: var(--gold); }
+.s-press { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.15em; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+#move-counter {
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em;
+}
+
+#progress-info { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── LEGEND ── */
+.legend {
+  display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── CLEAR ── */
+#clear { gap: 12px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label { font-size: 0.75rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+.clear-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  background: linear-gradient(135deg, var(--gold), var(--ivory));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(255,215,0,0.5));
+  animation: clearpop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes clearpop { 0%{transform:scale(0.2) rotate(-5deg);opacity:0} 100%{transform:scale(1) rotate(0);opacity:1} }
+.clear-msg { font-size: 0.8rem; color: var(--text); letter-spacing: 0.08em; max-width: 320px; line-height: 1.9; }
+.clear-next { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup" class="screen active">
+  <div class="logo">♞ Knight Pathfinder</div>
+  <div class="tagline">minimum moves · any valid route · chess vision</div>
+
+  <div class="best-row" id="bestRow"></div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>journeys per level</label>
+      <input type="range" id="slJourneys" min="5" max="50" step="5" value="25">
+      <span class="setting-val" id="outJourneys">25</span>
+    </div>
+    <div class="setting-row">
+      <label>time limit (lvl 6+)</label>
+      <input type="range" id="slTime" min="2" max="15" step="0.5" value="4">
+      <span class="setting-val" id="outTime">4.0s</span>
+    </div>
+    <div class="setting-row">
+      <label>time decay per level</label>
+      <input type="range" id="slDecay" min="80" max="99" step="1" value="95">
+      <span class="setting-val" id="outDecay">95%</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start climbing</button>
+
+  <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:320px;line-height:1.9;">
+    levels 1–5 · fixed distances (2–6 moves) · untimed<br>
+    level 6+ · mixed distances · timed · 95% per level<br>
+    click valid squares to move · any optimal route accepted
+  </div>
+</div>
+
+<!-- ══ DRILL ══ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">25</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+    <div class="hud-stat"><div class="val" id="hudMoves">—</div><div class="lbl">Min</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-badge"></div>
+
+    <div class="board-wrap">
+      <div class="board-with-coords">
+        <div class="rank-labels" id="rankLabels"></div>
+        <div>
+          <div id="board"></div>
+          <div class="file-labels" id="fileLabels"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status-area">
+      <div id="status-msg"></div>
+      <div id="move-counter"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--sq-knight)"></div>knight</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--sq-target)"></div>target</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green);opacity:0.7"></div>valid move</div>
+    </div>
+
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══ CLEAR ══ -->
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title" id="clearTitle">CLEARED!</div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ tap or press space to continue</div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="gameover" class="screen">
+  <div class="go-title">game over</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.7rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">▶ try again</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// KNIGHT MOVE LOGIC & BFS
+// ══════════════════════════════════════════════════
+
+const KNIGHT_DELTAS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+
+function knightMoves(r, c) {
+  return KNIGHT_DELTAS
+    .map(([dr,dc]) => [r+dr, c+dc])
+    .filter(([nr,nc]) => nr>=0 && nr<8 && nc>=0 && nc<8);
+}
+
+// BFS: returns minimum distance from (sr,sc) to (er,ec)
+function bfsDist(sr, sc, er, ec) {
+  if (sr===er && sc===ec) return 0;
+  const visited = Array.from({length:8}, ()=>new Array(8).fill(false));
+  const queue = [[sr, sc, 0]];
+  visited[sr][sc] = true;
+  while (queue.length) {
+    const [r, c, d] = queue.shift();
+    for (const [nr,nc] of knightMoves(r,c)) {
+      if (nr===er && nc===ec) return d+1;
+      if (!visited[nr][nc]) { visited[nr][nc]=true; queue.push([nr,nc,d+1]); }
+    }
+  }
+  return Infinity;
+}
+
+// BFS: returns one optimal path from start to end as array of [r,c]
+function bfsPath(sr, sc, er, ec) {
+  if (sr===er && sc===ec) return [[sr,sc]];
+  const prev = Array.from({length:8}, ()=>Array.from({length:8}, ()=>null));
+  const visited = Array.from({length:8}, ()=>new Array(8).fill(false));
+  const queue = [[sr,sc]];
+  visited[sr][sc] = true;
+  let found = false;
+  outer: while (queue.length) {
+    const [r,c] = queue.shift();
+    for (const [nr,nc] of knightMoves(r,c)) {
+      if (!visited[nr][nc]) {
+        visited[nr][nc]=true;
+        prev[nr][nc]=[r,c];
+        if (nr===er && nc===ec) { found=true; break outer; }
+        queue.push([nr,nc]);
+      }
+    }
+  }
+  if (!found) return [];
+  const path=[];
+  let cur=[er,ec];
+  while (cur) { path.unshift(cur); const p=prev[cur[0]][cur[1]]; cur=p; }
+  return path;
+}
+
+// Generate a random pair [start, target] with exact BFS distance = requiredDist
+function randomPairWithDist(requiredDist) {
+  let attempts = 0;
+  while (attempts < 500) {
+    const sr = Math.floor(Math.random()*8);
+    const sc = Math.floor(Math.random()*8);
+    const er = Math.floor(Math.random()*8);
+    const ec = Math.floor(Math.random()*8);
+    if (sr===er && sc===ec) { attempts++; continue; }
+    if (bfsDist(sr,sc,er,ec) === requiredDist) return {sr,sc,er,ec};
+    attempts++;
+  }
+  // fallback: known 2-move pair
+  return {sr:0,sc:0,er:1,ec:2};
+}
+
+// ══════════════════════════════════════════════════
+// LEVEL CONFIG
+// ══════════════════════════════════════════════════
+
+let journeysPerLevel = 25;
+let baseTime = 4.0;
+let decayRate = 0.95;
+
+function getLevelConfig(levelIndex) {
+  if (levelIndex < 5) {
+    // Levels 1-5: fixed distances 2-6
+    const dist = levelIndex + 2;
+    return { dist, timed: false, timeLimit: null, desc: `${dist}-move journeys` };
+  }
+  // Level 6+: mixed distances, timed
+  const timedIndex = levelIndex - 5; // 0-based
+  const timeLimit = baseTime * Math.pow(decayRate, timedIndex);
+  const dist = 2 + Math.floor(Math.random() * 5); // 2-6
+  return { dist, timed: true, timeLimit, desc: `mixed · ${timeLimit.toFixed(2)}s` };
+}
+
+// For timed levels, we need to pre-generate dist each journey
+function pickDist() {
+  return 2 + Math.floor(Math.random() * 5);
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let currentLevel = 0;
+let levelDone = 0;
+let streak = 0;
+let sessionLog = [];
+let sessionStart = null;
+let waitingForClear = false;
+let phase = 'idle'; // 'playing' | 'reveal' | 'idle'
+
+let knightR = 0, knightC = 0;
+let targetR = 0, targetC = 0;
+let minMoves = 0;
+let movesTaken = 0;
+let visitedPath = []; // [{r,c}]
+let currentTimeLimit = 0;
+let timerAnimFrame = null;
+let journeyStart = 0;
+let waitingForSpace = false; // waiting for space after fail reveal
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('kpfBestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('kpfBestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('kpfBestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('kpfBestStreak', v); refreshBest(); }
+
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  // per-level bests
+  const row = document.getElementById('bestRow');
+  if (!row) return;
+  let html = '';
+  for (let i=1; i<=Math.max(5, bl+1); i++) {
+    const pb = parseInt(localStorage.getItem(`kpfBest_L${i}`) || '0');
+    html += `<div class="best-item">
+      <div class="bval">${pb > 0 ? pb : '—'}</div>
+      <div class="blbl">L${i} best</div>
+    </div>`;
+  }
+  html += `<div class="best-item"><div class="bval">${bs > 0 ? bs : '—'}</div><div class="blbl">streak</div></div>`;
+  row.innerHTML = html;
+}
+
+function saveLevelBest(levelIndex, streak) {
+  const key = `kpfBest_L${levelIndex+1}`;
+  const cur = parseInt(localStorage.getItem(key) || '0');
+  if (streak > cur) localStorage.setItem(key, streak);
+}
+
+// ══════════════════════════════════════════════════
+// BOARD RENDERING
+// ══════════════════════════════════════════════════
+
+function buildBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  for (let r=7; r>=0; r--) {
+    for (let c=0; c<8; c++) {
+      const sq = document.createElement('div');
+      sq.className = 'sq ' + ((r+c)%2===0 ? 'dark' : 'light');
+      sq.id = `sq-${r}-${c}`;
+      sq.addEventListener('click', () => handleSquareClick(r, c));
+      board.appendChild(sq);
+    }
+  }
+
+  // rank labels (8 down to 1)
+  const rankEl = document.getElementById('rankLabels');
+  rankEl.innerHTML = '';
+  const sqSize = Math.min(60, Math.max(36, Math.floor(window.innerWidth * 0.10)));
+  for (let r=7; r>=0; r--) {
+    const lbl = document.createElement('div');
+    lbl.className = 'rank-label';
+    lbl.style.height = sqSize + 'px';
+    lbl.textContent = r+1;
+    rankEl.appendChild(lbl);
+  }
+
+  // file labels (a-h)
+  const fileEl = document.getElementById('fileLabels');
+  fileEl.innerHTML = '';
+  for (let c=0; c<8; c++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'file-label';
+    lbl.style.width = sqSize + 'px';
+    lbl.textContent = 'abcdefgh'[c];
+    fileEl.appendChild(lbl);
+  }
+}
+
+function getSq(r, c) { return document.getElementById(`sq-${r}-${c}`); }
+
+function renderBoard() {
+  // Clear all state classes
+  for (let r=0; r<8; r++) {
+    for (let c=0; c<8; c++) {
+      const sq = getSq(r,c);
+      sq.className = 'sq ' + ((r+c)%2===0 ? 'dark' : 'light');
+      sq.innerHTML = '';
+    }
+  }
+
+  if (phase !== 'playing' && phase !== 'reveal') return;
+
+  // Target
+  const tSq = getSq(targetR, targetC);
+  tSq.classList.add('target-pos');
+  tSq.innerHTML = '♟';
+
+  // Knight
+  const kSq = getSq(knightR, knightC);
+  kSq.classList.add('knight-pos');
+  kSq.innerHTML = '♞';
+
+  if (phase === 'playing') {
+    // Valid moves (green dots)
+    for (const [nr,nc] of knightMoves(knightR, knightC)) {
+      if (nr===targetR && nc===targetC) continue; // target handles its own style
+      getSq(nr,nc).classList.add('valid-move');
+    }
+    // Visited squares (red tinge)
+    for (const {r,c} of visitedPath) {
+      if (r===knightR && c===knightC) continue;
+      getSq(r,c).classList.add('visited');
+    }
+  }
+
+  if (phase === 'reveal') {
+    // Show visited path in red with move numbers
+    visitedPath.forEach(({r,c}, i) => {
+      const sq = getSq(r,c);
+      sq.classList.add('visited');
+      if (i > 0) {
+        const lbl = document.createElement('div');
+        lbl.className = 'move-label';
+        lbl.textContent = i;
+        sq.appendChild(lbl);
+      }
+    });
+
+    // Show optimal path in gold
+    const optPath = bfsPath(visitedPath[0].r, visitedPath[0].c, targetR, targetC);
+    optPath.forEach(([r,c], i) => {
+      const sq = getSq(r,c);
+      if (!sq.classList.contains('visited')) sq.classList.add('optimal-path');
+      if (i > 0 && i < optPath.length) {
+        const lbl = document.createElement('div');
+        lbl.className = 'move-label';
+        lbl.style.color = sq.classList.contains('visited') ? 'var(--gold)' : 'var(--gold)';
+        lbl.textContent = '→' + i;
+        sq.appendChild(lbl);
+      }
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function updateProgressBar() {
+  const pct = Math.min(100, Math.round(levelDone / journeysPerLevel * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('hudDone').textContent = levelDone;
+  document.getElementById('hudNeeded').textContent = journeysPerLevel;
+  const cfg = getLevelConfig(currentLevel);
+  document.getElementById('progress-info').textContent =
+    `${levelDone} / ${journeysPerLevel} · level ${currentLevel+1} · ${cfg.desc}`;
+}
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  buildBoard();
+  show('drill');
+  startLevel();
+}
+
+function startLevel() {
+  levelDone = 0;
+  const cfg = getLevelConfig(currentLevel);
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('level-badge').textContent =
+    `level ${currentLevel+1} · ${cfg.desc}`;
+  updateProgressBar();
+  nextJourney();
+}
+
+function nextJourney() {
+  clearTimers();
+  waitingForSpace = false;
+  phase = 'playing';
+
+  const cfg = getLevelConfig(currentLevel);
+  // For timed levels, pick a fresh random distance each journey
+  const dist = cfg.timed ? pickDist() : cfg.dist;
+  const pair = randomPairWithDist(dist);
+  knightR = pair.sr; knightC = pair.sc;
+  targetR = pair.er; targetC = pair.ec;
+  minMoves = dist;
+  movesTaken = 0;
+  visitedPath = [{r: knightR, c: knightC}];
+
+  document.getElementById('hudMoves').textContent = minMoves;
+  document.getElementById('status-msg').textContent = '';
+  document.getElementById('status-msg').className = '';
+  document.getElementById('move-counter').textContent = `moves: 0 / ${minMoves}`;
+
+  renderBoard();
+  updateProgressBar();
+
+  if (cfg.timed) {
+    currentTimeLimit = cfg.timeLimit;
+    journeyStart = performance.now();
+    startTimer();
+  } else {
+    document.getElementById('timer-bar').style.width = '100%';
+    document.getElementById('timer-bar').style.background = 'var(--green)';
+  }
+}
+
+function handleSquareClick(r, c) {
+  if (phase !== 'playing') return;
+  if (waitingForSpace) return;
+
+  // Check if it's a valid knight move from current position
+  const valid = knightMoves(knightR, knightC);
+  if (!valid.some(([nr,nc]) => nr===r && nc===c)) return;
+
+  // Move the knight
+  knightR = r; knightC = c;
+  movesTaken++;
+  visitedPath.push({r, c});
+  document.getElementById('move-counter').textContent = `moves: ${movesTaken} / ${minMoves}`;
+
+  // Check: reached target
+  if (r===targetR && c===targetC) {
+    clearTimers();
+    // Success — any path of exactly minMoves is valid
+    // (movesTaken === minMoves guaranteed because we fail early if exceeded)
+    handleSuccess();
+    return;
+  }
+
+  // Check: exceeded minimum move count
+  if (movesTaken >= minMoves) {
+    clearTimers();
+    handleFail('exceeded');
+    return;
+  }
+
+  renderBoard();
+}
+
+function handleSuccess() {
+  phase = 'feedback';
+  streak++;
+  levelDone++;
+  if (streak > getBestStreak()) saveBestStreak(streak);
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('status-msg').textContent = 'correct';
+  document.getElementById('status-msg').className = 's-ok';
+  document.getElementById('move-counter').textContent = `solved in ${movesTaken} move${movesTaken!==1?'s':''}`;
+  renderBoard();
+  updateProgressBar();
+
+  sessionLog.push({ level: currentLevel+1, minMoves, movesTaken, success: true });
+
+  if (levelDone >= journeysPerLevel) {
+    setTimeout(showClear, 500);
+  } else {
+    setTimeout(nextJourney, 600);
+  }
+}
+
+function handleFail(reason) {
+  phase = 'reveal';
+  streak = 0;
+  document.getElementById('hudStreak').textContent = 0;
+  document.getElementById('timer-bar').style.width = '0%';
+
+  const msg = reason === 'time' ? 'too slow' : 'too many moves';
+  document.getElementById('status-msg').textContent = msg;
+  document.getElementById('status-msg').className = 's-err';
+
+  // Push current position to path if not already there
+  if (reason === 'time') visitedPath.push({r: knightR, c: knightC});
+
+  renderBoard();
+
+  // Show press space message
+  setTimeout(() => {
+    document.getElementById('move-counter').textContent = '';
+    const pressEl = document.createElement('div');
+    pressEl.className = 's-press';
+    pressEl.textContent = 'press space or tap to try again';
+    document.getElementById('status-msg').after(pressEl);
+    waitingForSpace = true;
+  }, 300);
+
+  sessionLog.push({ level: currentLevel+1, minMoves, movesTaken, success: false, reason });
+}
+
+function retryAfterFail() {
+  if (!waitingForSpace) return;
+  // Remove press message
+  const pressEl = document.querySelector('.s-press');
+  if (pressEl) pressEl.remove();
+  nextJourney();
+}
+
+// ══════════════════════════════════════════════════
+// TIMER
+// ══════════════════════════════════════════════════
+
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  function tick() {
+    const elapsed = (performance.now() - journeyStart) / 1000;
+    const left = Math.max(0, currentTimeLimit - elapsed);
+    const pct = left / currentTimeLimit;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct*100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    if (left > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else handleFail('time');
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════
+
+const CLEAR_MESSAGES = [
+  "2-move knight paths. The L-shape is in your hands.",
+  "3 moves. You're seeing two steps ahead.",
+  "4-move paths. The board is opening up.",
+  "5 moves. Complex routes, clean execution.",
+  "6 moves. Maximum distance mastered. Speed begins.",
+  "Mixed distances, on the clock. Knight vision under pressure.",
+  "Faster. Your spatial memory is compressing.",
+  "Elite speed. The knight moves without thinking.",
+  "Legendary. Pure pattern recognition.",
+];
+
+function getClearMsg(lvl) {
+  return CLEAR_MESSAGES[Math.min(lvl-1, CLEAR_MESSAGES.length-1)];
+}
+
+function showClear() {
+  saveLevelBest(currentLevel, streak);
+  const lvl = currentLevel + 1;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `Level ${lvl} complete`;
+  document.getElementById('clearTitle').textContent =
+    lvl >= 7 ? 'LEGENDARY!' : lvl >= 5 ? 'BLAZING!' : lvl >= 3 ? 'SHARP!' : 'CLEARED!';
+  document.getElementById('clearMsg').textContent = getClearMsg(lvl);
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  currentLevel++;
+  show('drill');
+  startLevel();
+}
+
+// ══════════════════════════════════════════════════
+// GAME OVER (only in timed levels on fail)
+// ══════════════════════════════════════════════════
+
+// In levels 1-5 (untimed), fails just reset the journey — no game over.
+// In level 6+, a single fail ends the run.
+// We'll handle this in handleFail: in timed levels, after space, go to gameover.
+
+let timedFailPending = false;
+
+function handleFailWithGameOver(reason) {
+  const cfg = getLevelConfig(currentLevel);
+  if (!cfg.timed) {
+    // Untimed: just retry
+    handleFail(reason);
+    timedFailPending = false;
+  } else {
+    // Timed: show board, then game over on space
+    handleFail(reason);
+    timedFailPending = true;
+  }
+}
+
+function showGameOver() {
+  phase = 'idle';
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.success).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} journeys · ${correct} solved · streak peak: ${getBestStreak()}`;
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#ffd700','#e8d5a3','#00f5ff','#ff006e','#00ff88'];
+  const particles = Array.from({length:80}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5,
+    vx: (Math.random()-0.5)*4, vy: Math.random()*3+1,
+    size: Math.random()*6+2, color: colors[Math.floor(Math.random()*colors.length)],
+    alpha: 1, rot: Math.random()*Math.PI*2, rotv: (Math.random()-0.5)*0.2
+  }));
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height); let alive=false;
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.alpha-=0.008; p.rot+=p.rotv;
+      if (p.alpha>0) {
+        alive=true; ctx.save(); ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color;
+        ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); ctx.restore();
+      }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ══════════════════════════════════════════════════
+// PATCH handleFail to route timed vs untimed
+// ══════════════════════════════════════════════════
+
+// Override handleFail to handle timed vs untimed game-over logic
+const _originalHandleFail = handleFail;
+// Rebind handleSquareClick and timer to use the routing version
+function routedFail(reason) {
+  handleFailWithGameOver(reason);
+}
+
+// Patch timer to use routed fail
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  function tick() {
+    const elapsed = (performance.now() - journeyStart) / 1000;
+    const left = Math.max(0, currentTimeLimit - elapsed);
+    const pct = left / currentTimeLimit;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct*100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    if (left > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else routedFail('time');
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+// Patch handleSquareClick exceed check
+function handleSquareClick(r, c) {
+  if (phase !== 'playing') return;
+  if (waitingForSpace) return;
+  const valid = knightMoves(knightR, knightC);
+  if (!valid.some(([nr,nc]) => nr===r && nc===c)) return;
+  knightR = r; knightC = c;
+  movesTaken++;
+  visitedPath.push({r, c});
+  document.getElementById('move-counter').textContent = `moves: ${movesTaken} / ${minMoves}`;
+  if (r===targetR && c===targetC) { clearTimers(); handleSuccess(); return; }
+  if (movesTaken >= minMoves) { clearTimers(); routedFail('exceeded'); return; }
+  renderBoard();
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('slJourneys').addEventListener('input', function() {
+  journeysPerLevel = parseInt(this.value);
+  document.getElementById('outJourneys').textContent = this.value;
+});
+document.getElementById('slTime').addEventListener('input', function() {
+  baseTime = parseFloat(this.value);
+  document.getElementById('outTime').textContent = parseFloat(this.value).toFixed(1) + 's';
+});
+document.getElementById('slDecay').addEventListener('input', function() {
+  decayRate = parseInt(this.value) / 100;
+  document.getElementById('outDecay').textContent = this.value + '%';
+});
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => { clearTimers(); show('setup'); });
+
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.getElementById('clear').addEventListener('touchend', e => { e.preventDefault(); proceedFromClear(); });
+
+// Board touch fallback
+document.getElementById('board').addEventListener('touchend', e => {
+  if (waitingForSpace) { e.preventDefault(); retryOrGameOver(); }
+}, {passive: false});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (document.getElementById('clear').classList.contains('active')) {
+      proceedFromClear();
+    } else if (waitingForSpace) {
+      retryOrGameOver();
+    }
+  }
+});
+
+function retryOrGameOver() {
+  if (timedFailPending) {
+    timedFailPending = false;
+    waitingForSpace = false;
+    const pressEl = document.querySelector('.s-press');
+    if (pressEl) pressEl.remove();
+    showGameOver();
+  } else {
+    retryAfterFail();
+  }
+}
+
+// init
+refreshBest();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
