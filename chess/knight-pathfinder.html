@@ -205,20 +205,13 @@ body::after {
   50%      { box-shadow: inset 0 0 24px rgba(255,0,110,0.8); }
 }
 
-.sq.valid-move {
-  cursor: pointer;
+.sq.trail {
+  background: rgba(255,180,0,0.28) !important;
+  box-shadow: inset 0 0 8px rgba(255,180,0,0.2);
 }
-.sq.valid-move::after {
-  content: '';
-  position: absolute;
-  width: 38%;
-  height: 38%;
-  border-radius: 50%;
-  background: var(--green);
-  opacity: 0.7;
-  box-shadow: 0 0 8px var(--green);
-}
-.sq.valid-move:hover { filter: brightness(1.2); }
+
+.sq.clickable { cursor: pointer; }
+.sq.clickable:hover { filter: brightness(1.15); }
 
 .sq.visited {
   background: rgba(255,0,60,0.35) !important;
@@ -381,7 +374,7 @@ body::after {
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--sq-knight)"></div>knight</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--sq-target)"></div>target</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--green);opacity:0.7"></div>valid move</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(255,180,0,0.5)"></div>trail</div>
     </div>
 
     <div id="progress-info"></div>
@@ -627,15 +620,15 @@ function renderBoard() {
   kSq.innerHTML = '♞';
 
   if (phase === 'playing') {
-    // Valid moves (green dots)
-    for (const [nr,nc] of knightMoves(knightR, knightC)) {
-      if (nr===targetR && nc===targetC) continue; // target handles its own style
-      getSq(nr,nc).classList.add('valid-move');
-    }
-    // Visited squares (red tinge)
+    // All squares get pointer cursor
+    for (let r=0; r<8; r++)
+      for (let c=0; c<8; c++)
+        getSq(r,c).classList.add('clickable');
+
+    // Trail: all squares knight has visited except current position
     for (const {r,c} of visitedPath) {
       if (r===knightR && c===knightC) continue;
-      getSq(r,c).classList.add('visited');
+      getSq(r,c).classList.add('trail');
     }
   }
 
@@ -1060,6 +1053,6 @@ function retryOrGameOver() {
 // init
 refreshBest();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
 </body>
 </html>
