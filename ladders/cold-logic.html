@@ -393,9 +393,9 @@ body::after {
   <button class="start-btn" id="startBtn">begin</button>
 
   <div style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:340px;line-height:2;">
-    levels 1–5 · valid syllogisms<br>
-    levels 6–10 · invalid conclusions · cbd introduced<br>
-    levels 11–50 · coming soon
+    levels 1–25 · valid / invalid · argument structure only<br>
+    levels 26–50 · valid / invalid / unsupported<br>
+    levels 1–10 available now
   </div>
 </div>
 
@@ -422,9 +422,9 @@ body::after {
     </div>
 
     <div class="answer-btns" id="answerBtns">
-      <button class="ans-btn" id="btnTrue"  onclick="submitAnswer('TRUE')">True</button>
-      <button class="ans-btn" id="btnFalse" onclick="submitAnswer('FALSE')">False</button>
-      <button class="ans-btn" id="btnCBD"   onclick="submitAnswer('CBD')" style="display:none">Cannot Be Determined</button>
+      <button class="ans-btn" id="btnTrue"  onclick="submitAnswer('TRUE')">Valid</button>
+      <button class="ans-btn" id="btnFalse" onclick="submitAnswer('FALSE')">Invalid</button>
+      <button class="ans-btn" id="btnCBD"   onclick="submitAnswer('CBD')" style="display:none">Unsupported</button>
     </div>
 
     <div id="explanation-panel">
@@ -541,7 +541,6 @@ function genBarbaraSyllogism() {
   const [spec] = [pick(POOLS.specific_animals)];
   const prop = pick(POOLS.properties_positive);
   const category = pick(POOLS.animals);
-  // All [category] are [prop]. [Name] is a [singular category]. Therefore [Name] is [prop].
   return {
     premises: [
       `All ${category[0]} are ${prop}.`,
@@ -550,8 +549,8 @@ function genBarbaraSyllogism() {
     ],
     conclusion: `${spec[2]} is ${prop}.`,
     answer: 'TRUE',
-    explanation: `The argument follows a chain of categorical reasoning. Since all ${spec[0]} are ${category[0]}, and all ${category[0]} are ${prop}, it necessarily follows that ${spec[2]} — being a ${spec[1]} — is ${prop}. The conclusion cannot be denied without contradicting the premises.`,
-    principle: 'Valid categorical syllogism — Barbara form (All A are B; All B are C; therefore All A are C)',
+    explanation: `The conclusion follows necessarily from the premises. Since all ${spec[0]} are ${category[0]}, and all ${category[0]} are ${prop}, any individual ${spec[1]} must be ${prop}. The argument is valid — denying the conclusion would contradict the premises.`,
+    principle: 'Valid argument — Barbara form (All A are B; All B are C; therefore All A are C)',
     type: 'categorical syllogism',
   };
 }
@@ -568,8 +567,8 @@ function genCelarentSyllogism() {
     ],
     conclusion: `${spec[2]} is not ${trait2}.`,
     answer: 'TRUE',
-    explanation: `Since no ${trait1} creature can be ${trait2}, and ${spec[2]} is a ${spec[1]} — which is ${trait1} — the conclusion follows with certainty. The universal negative in the first premise excludes all members of the first category from the second.`,
-    principle: 'Valid categorical syllogism — Celarent form (No A are B; All C are A; therefore No C are B)',
+    explanation: `The conclusion follows necessarily. The first premise universally excludes all ${trait1} creatures from being ${trait2}. The second places all ${spec[0]} within the ${trait1} category. ${spec[2]}, as a ${spec[1]}, inherits that exclusion. The argument is valid.`,
+    principle: 'Valid argument — Celarent form (No A are B; All C are A; therefore No C are B)',
     type: 'categorical syllogism',
   };
 }
@@ -585,8 +584,8 @@ function genDariiSyllogism() {
     ],
     conclusion: `Some ${cat2[0]} are ${prop}.`,
     answer: 'TRUE',
-    explanation: `Because all ${cat1[0]} are ${prop}, and at least some ${cat2[0]} belong to the category of ${cat1[0]}, those particular ${cat2[0]} must also be ${prop}. The partial membership is enough to guarantee the conclusion.`,
-    principle: 'Valid categorical syllogism — Darii form (All A are B; Some C are A; therefore Some C are B)',
+    explanation: `The conclusion follows necessarily. Some ${cat2[0]} fall within the category of ${cat1[0]}, and all ${cat1[0]} are ${prop} — so those particular ${cat2[0]} must also be ${prop}. Partial membership is sufficient. The argument is valid.`,
+    principle: 'Valid argument — Darii form (All A are B; Some C are A; therefore Some C are B)',
     type: 'categorical syllogism',
   };
 }
@@ -602,8 +601,8 @@ function genTransitiveSyllogism() {
     ],
     conclusion: `All ${cat1[0]} are ${prop}.`,
     answer: 'TRUE',
-    explanation: `This is a straightforward transitive chain. The first premise places all ${cat1[0]} inside the category of ${cat2[0]}. The second places all ${cat2[0]} among the ${prop}. The intersection is complete — every ${cat1[1]} is necessarily ${prop}.`,
-    principle: 'Hypothetical syllogism / transitive categorical reasoning',
+    explanation: `The conclusion follows necessarily via a transitive chain. Every ${cat1[1]} is a ${cat2[1]}, and every ${cat2[1]} is ${prop} — so every ${cat1[1]} must be ${prop}. No step in this chain can be denied without contradicting a premise. The argument is valid.`,
+    principle: 'Valid argument — hypothetical syllogism / transitive categorical chain',
     type: 'categorical syllogism',
   };
 }
@@ -619,15 +618,15 @@ function genPeopleSyllogism() {
     ],
     conclusion: `${person[2]} is ${prop}.`,
     answer: 'TRUE',
-    explanation: `The argument is structurally valid. Every member of the category "${person[0]}" is ${prop} by the first premise. ${person[2]} is placed within that category by the second. The conclusion is inescapable.`,
-    principle: 'Valid categorical syllogism — Barbara form',
+    explanation: `The conclusion follows necessarily. Every ${person[1]} is ${prop} by the first premise. ${person[2]} is placed within that category by the second. The argument is valid — there is no gap between the premises and the conclusion.`,
+    principle: 'Valid argument — Barbara form',
     type: 'categorical syllogism',
   };
 }
 
-// ── LEVELS 6–10: Invalid / CBD ──
+// ── LEVELS 6–10: Invalid only (no Unsupported yet) ──
 
-// Undistributed middle: All A are C. All B are C. Therefore All A are B. → FALSE
+// Undistributed middle: All A are C. All B are C. Therefore All A are B. → INVALID
 function genUndistributedMiddle() {
   const [cat1, cat2] = pickTwo(POOLS.animals);
   const prop = pick(POOLS.properties_positive);
@@ -638,13 +637,13 @@ function genUndistributedMiddle() {
     ],
     conclusion: `All ${cat1[0]} are ${cat2[0]}.`,
     answer: 'FALSE',
-    explanation: `Both categories share the property of being ${prop}, but sharing a trait does not make them the same thing. ${cat1[0].charAt(0).toUpperCase() + cat1[0].slice(1)} and ${cat2[0]} are distinct categories that happen to overlap with a third. The middle term ("${prop}") is undistributed — it never covers the full extent of either category.`,
-    principle: 'Fallacy of the undistributed middle term',
+    explanation: `The conclusion does not follow from the premises. Sharing a property — being ${prop} — does not establish any relationship between the two categories themselves. There may be many things that are ${prop} without any connection to each other. This is the fallacy of the undistributed middle: the shared term never covers the full extent of either category, so no bridge between them is built.`,
+    principle: 'Invalid argument — fallacy of the undistributed middle term',
     type: 'invalid syllogism',
   };
 }
 
-// Illicit minor: All A are B. All A are C. Therefore All B are C. → FALSE
+// Illicit minor: All A are B. All A are C. Therefore All B are C. → INVALID
 function genIllicitMinor() {
   const [cat1, cat2] = pickTwo(POOLS.animals);
   const prop = pick(POOLS.properties_positive);
@@ -655,31 +654,30 @@ function genIllicitMinor() {
     ],
     conclusion: `All ${prop} things are ${cat2[0]}.`,
     answer: 'FALSE',
-    explanation: `The premises only tell us about ${cat1[0]}. We cannot conclude anything about all ${prop} things, because there may be ${prop} things that are not ${cat1[0]} — and therefore not necessarily ${cat2[0]}. The minor term is used in a broader sense in the conclusion than it was in the premises.`,
-    principle: 'Fallacy of the illicit minor term',
+    explanation: `The conclusion does not follow. The premises only establish facts about ${cat1[0]}. They say nothing about ${prop} things in general — there may be ${prop} things that are not ${cat1[0]}, and therefore not necessarily ${cat2[0]}. The minor term is used more broadly in the conclusion than the premises allow. The argument is invalid.`,
+    principle: 'Invalid argument — fallacy of the illicit minor term',
     type: 'invalid syllogism',
   };
 }
 
-// Some A are B. X is A. Therefore X is B. → CBD
-function genSomeFallacyCBD() {
+// Some A are B. X is A. Therefore X is B. → INVALID
+function genSomeFallacyInvalid() {
   const spec = pick(POOLS.specific_animals);
   const prop = pick(POOLS.properties_positive);
-  const [cat] = [pick(POOLS.animals)];
   return {
     premises: [
       `Some ${spec[0]} are ${prop}.`,
       `${spec[2]} is a ${spec[1]}.`,
     ],
     conclusion: `${spec[2]} is ${prop}.`,
-    answer: 'CBD',
-    explanation: `"Some" means at least one — not all. Just because some ${spec[0]} are ${prop} does not mean every individual ${spec[1]} is. ${spec[2]} might be among the ${prop} ones, or might not. The premises do not give us enough information to decide either way.`,
-    principle: 'Cannot be determined — existential fallacy / quantifier scope error',
-    type: 'invalid syllogism (CBD)',
+    answer: 'FALSE',
+    explanation: `The conclusion does not follow. "Some" means at least one — not all. The first premise establishes that a subset of ${spec[0]} are ${prop}, but says nothing about ${spec[2]} specifically. From these premises alone, we cannot conclude that ${spec[2]} is among the ${prop} ones. The argument is invalid.`,
+    principle: 'Invalid argument — existential fallacy, quantifier scope error',
+    type: 'invalid syllogism',
   };
 }
 
-// No A are B. Some C are A. Therefore no C are B. → FALSE (should be: some C are not B)
+// No A are B. Some C are A. Therefore no C are B. → INVALID
 function genNegativeSomeFallacy() {
   const [cat1, cat2] = pickTwo(POOLS.animals);
   const prop = pick(POOLS.properties_positive);
@@ -690,14 +688,14 @@ function genNegativeSomeFallacy() {
     ],
     conclusion: `No ${cat2[0]} are ${prop}.`,
     answer: 'FALSE',
-    explanation: `The premises only establish that some ${cat2[0]} — specifically those that are also ${cat1[0]} — are not ${prop}. Other ${cat2[0]} that are not ${cat1[0]} may well be ${prop}. The conclusion overclaims by extending the negative judgment to all ${cat2[0]}.`,
-    principle: 'Illicit negative — overgeneralising from a partial membership',
+    explanation: `The conclusion does not follow. The premises establish that some ${cat2[0]} — those that are also ${cat1[0]} — are not ${prop}. But other ${cat2[0]} that are not ${cat1[0]} may well be ${prop}. The conclusion extends a partial negative to a universal one. The argument is invalid.`,
+    principle: 'Invalid argument — illicit negative generalisation',
     type: 'invalid syllogism',
   };
 }
 
-// All A are B. X is not A. Therefore X is not B. → CBD (denying the antecedent preview)
-function genDenyingAntecedentPreviewCBD() {
+// All A are B. X is not A. Therefore X is not B. → INVALID
+function genDenyingAntecedentInvalid() {
   const person = pick(POOLS.people);
   const prop = pick(POOLS.properties_positive);
   return {
@@ -706,10 +704,10 @@ function genDenyingAntecedentPreviewCBD() {
       `${person[2]} is not a ${person[1]}.`,
     ],
     conclusion: `${person[2]} is not ${prop}.`,
-    answer: 'CBD',
-    explanation: `The first premise tells us that being a ${person[1]} is sufficient for being ${prop} — but it does not say it is the only way to be ${prop}. ${person[2]} might be ${prop} for entirely different reasons. We simply cannot tell from these premises.`,
-    principle: 'Cannot be determined — previews the fallacy of denying the antecedent',
-    type: 'invalid syllogism (CBD)',
+    answer: 'FALSE',
+    explanation: `The conclusion does not follow. The first premise tells us that being a ${person[1]} is sufficient for being ${prop} — but not that it is the only way to be ${prop}. ${person[2]} might be ${prop} through entirely different means. Denying the sufficient condition does not deny the conclusion. The argument is invalid.`,
+    principle: 'Invalid argument — denying the antecedent',
+    type: 'invalid syllogism',
   };
 }
 
@@ -719,18 +717,16 @@ function genDenyingAntecedentPreviewCBD() {
 
 // Pool of generators per level group
 const LEVEL_POOLS = {
-  // Levels 1-5: valid syllogisms only (TRUE answers)
   1: [genBarbaraSyllogism, genCelarentSyllogism, genPeopleSyllogism, genTransitiveSyllogism, genDariiSyllogism],
   2: [genBarbaraSyllogism, genCelarentSyllogism, genPeopleSyllogism, genTransitiveSyllogism, genDariiSyllogism],
   3: [genBarbaraSyllogism, genTransitiveSyllogism, genDariiSyllogism, genCelarentSyllogism, genPeopleSyllogism],
   4: [genTransitiveSyllogism, genDariiSyllogism, genBarbaraSyllogism, genCelarentSyllogism, genPeopleSyllogism],
   5: [genBarbaraSyllogism, genCelarentSyllogism, genTransitiveSyllogism, genDariiSyllogism, genPeopleSyllogism],
-  // Levels 6-10: invalid / CBD (CBD button appears)
-  6: [genUndistributedMiddle, genIllicitMinor, genSomeFallacyCBD, genNegativeSomeFallacy, genDenyingAntecedentPreviewCBD],
-  7: [genUndistributedMiddle, genSomeFallacyCBD, genDenyingAntecedentPreviewCBD, genIllicitMinor, genNegativeSomeFallacy],
-  8: [genUndistributedMiddle, genIllicitMinor, genNegativeSomeFallacy, genSomeFallacyCBD, genDenyingAntecedentPreviewCBD],
-  9: [genSomeFallacyCBD, genDenyingAntecedentPreviewCBD, genUndistributedMiddle, genNegativeSomeFallacy, genIllicitMinor],
-  10:[genNegativeSomeFallacy, genUndistributedMiddle, genDenyingAntecedentPreviewCBD, genSomeFallacyCBD, genIllicitMinor],
+  6: [genUndistributedMiddle, genIllicitMinor, genSomeFallacyInvalid, genNegativeSomeFallacy, genDenyingAntecedentInvalid],
+  7: [genUndistributedMiddle, genSomeFallacyInvalid, genDenyingAntecedentInvalid, genIllicitMinor, genNegativeSomeFallacy],
+  8: [genUndistributedMiddle, genIllicitMinor, genNegativeSomeFallacy, genSomeFallacyInvalid, genDenyingAntecedentInvalid],
+  9: [genSomeFallacyInvalid, genDenyingAntecedentInvalid, genUndistributedMiddle, genNegativeSomeFallacy, genIllicitMinor],
+  10:[genNegativeSomeFallacy, genUndistributedMiddle, genDenyingAntecedentInvalid, genSomeFallacyInvalid, genIllicitMinor],
 };
 
 const TOTAL_LEVELS = 10; // will grow
@@ -842,7 +838,7 @@ function renderPuzzle(puzzle) {
   document.getElementById('conclusionEl').textContent = puzzle.conclusion;
   document.getElementById('explanation-panel').classList.remove('visible');
   resetAnswerBtns();
-  showCBDBtn(currentLevel >= 5); // CBD appears from level 6 onward
+  showCBDBtn(currentLevel >= 25); // Unsupported appears from level 26 onward
 }
 
 // ══════════════════════════════════════════════════
@@ -1071,6 +1067,6 @@ document.addEventListener('keydown', e => {
 // init
 refreshBest();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.0</div>
 </body>
 </html>
