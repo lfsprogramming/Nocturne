@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cold Logic — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06060a;
+  --surface: #0c0c12;
+  --border: #1c1c28;
+  --accent: #c8a96e;
+  --accent2: #7c9eb2;
+  --gold: #d4af6a;
+  --green: #6dba8a;
+  --warn: #c4884a;
+  --danger: #b85050;
+  --text: #d8d4cc;
+  --muted: #4a4858;
+  --dim: #2a2836;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 6px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 24px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 24px;
+  background: radial-gradient(ellipse at 50% 0%, #0e0e18 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: clamp(2.5rem, 10vw, 5rem);
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  text-shadow: 0 0 40px rgba(200,169,110,0.3);
+  animation: logopulse 4s ease-in-out infinite;
+  text-transform: uppercase;
+}
+@keyframes logopulse {
+  0%,100% { text-shadow: 0 0 30px rgba(200,169,110,0.2); }
+  50%      { text-shadow: 0 0 60px rgba(200,169,110,0.45); }
+}
+
+.tagline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.25em;
+  text-transform: uppercase; margin-top: -14px;
+}
+
+.rank-display {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.rank-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; font-style: italic; color: var(--accent2); letter-spacing: 0.1em;
+}
+.rank-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase;
+}
+
+.best-row { display: flex; gap: 32px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.4rem; color: var(--gold); line-height: 1;
+}
+.best-item .blbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase;
+}
+
+.section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em;
+  text-transform: uppercase; margin-bottom: 8px; text-align: center;
+}
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(360px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em;
+  text-transform: uppercase; min-width: 130px;
+}
+.setting-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.setting-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem; color: var(--accent); min-width: 44px; text-align: right;
+}
+
+.toggle-row { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; width: min(360px, 90vw); }
+.toggle-btn {
+  flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 8px 0; border: none; background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.toggle-btn.active { background: var(--accent); color: #000; }
+
+.start-btn {
+  font-family: 'Cormorant Garamond', serif; font-size: 1.2rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  padding: 12px 48px; border: 1px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 1px; transition: all 0.25s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--accent); transform: translateX(-100%); transition: transform 0.25s; z-index: -1;
+}
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.hud-stat .val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.3rem; line-height: 1; color: var(--accent);
+}
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em;
+  text-transform: uppercase; margin-top: 2px;
+}
+
+#timer-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 2px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.4s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 32px 24px 24px; width: 100%; max-width: 680px; margin: 0 auto;
+  gap: 28px;
+}
+
+#level-info {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em;
+  text-transform: uppercase; text-align: center;
+}
+
+/* puzzle card */
+.puzzle-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 28px 32px;
+  border-radius: 1px;
+  position: relative;
+}
+
+.puzzle-type-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.2em;
+  text-transform: uppercase; margin-bottom: 16px;
+}
+
+.premises {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-bottom: 20px;
+}
+
+.premise {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.1rem, 3vw, 1.35rem);
+  font-weight: 400; color: var(--text);
+  line-height: 1.5; letter-spacing: 0.01em;
+}
+
+.premise-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem; color: var(--muted);
+  margin-right: 10px; vertical-align: middle;
+}
+
+.divider-line {
+  border: none; border-top: 1px solid var(--border);
+  margin: 0 0 18px 0;
+}
+
+.conclusion-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.15em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+
+.conclusion {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.15rem, 3.2vw, 1.45rem);
+  font-weight: 500; color: var(--accent);
+  line-height: 1.5; font-style: italic;
+  letter-spacing: 0.01em;
+}
+
+/* answer buttons */
+.answer-btns {
+  display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+  width: 100%;
+}
+
+.ans-btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 12px 24px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  cursor: pointer; border-radius: 1px; transition: all 0.15s; flex: 1; min-width: 100px;
+}
+.ans-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(200,169,110,0.05); }
+.ans-btn.selected-correct { border-color: var(--green); color: var(--green); background: rgba(109,186,138,0.08); }
+.ans-btn.selected-wrong   { border-color: var(--danger); color: var(--danger); background: rgba(184,80,80,0.08); }
+.ans-btn.reveal-correct   { border-color: var(--green); color: var(--green); background: rgba(109,186,138,0.08); }
+.ans-btn:disabled { cursor: default; opacity: 0.5; }
+.ans-btn:disabled:hover { border-color: var(--border); color: var(--text); background: var(--surface); }
+.ans-btn.selected-correct:disabled, .ans-btn.selected-wrong:disabled, .ans-btn.reveal-correct:disabled {
+  opacity: 1;
+}
+
+/* explanation panel */
+#explanation-panel {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 28px;
+  border-radius: 1px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+#explanation-panel.visible { display: flex; }
+
+.explanation-header {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase;
+}
+
+.explanation-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1rem, 2.8vw, 1.2rem);
+  color: var(--text); line-height: 1.7; font-style: italic;
+}
+
+.logic-principle {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.1em;
+}
+
+.continue-btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 10px 28px; border: 1px solid var(--accent2); background: transparent;
+  color: var(--accent2); cursor: pointer; border-radius: 1px;
+  transition: all 0.15s; align-self: flex-start;
+}
+.continue-btn:hover { background: var(--accent2); color: #000; }
+
+#progress-info {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-align: center;
+}
+
+/* ── CLEAR ── */
+#clear { gap: 16px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase;
+}
+.clear-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: clamp(3rem, 12vw, 6rem); line-height: 1;
+  color: var(--gold); letter-spacing: 0.2em; text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(212,175,106,0.4);
+  animation: clearpop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes clearpop { 0%{transform:scale(0.3);opacity:0} 100%{transform:scale(1);opacity:1} }
+.clear-rank {
+  font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 1.3rem; color: var(--accent2); letter-spacing: 0.1em;
+}
+.clear-msg {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem; color: var(--muted); max-width: 380px; line-height: 1.8; font-style: italic;
+}
+.clear-next {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em;
+  text-transform: uppercase; animation: blink 1.2s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── GAME OVER ── */
+#gameover { gap: 20px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1;
+  color: var(--danger); letter-spacing: 0.2em; text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(184,80,80,0.4);
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-6px)} 25%{transform:translateX(6px)} 50%{transform:translateX(-4px)} 75%{transform:translateX(4px)} 100%{transform:translateX(0)} }
+.go-stat {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem; color: var(--muted); letter-spacing: 0.1em;
+}
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best {
+  font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 1.1rem; color: var(--gold);
+  animation: newbest 0.5s ease-out 0.3s both;
+}
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn {
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 10px 20px; border-radius: 1px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); transition: background 0.15s;
+}
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent); color: var(--accent); background: transparent; }
+.go-btn.primary:hover { background: var(--accent); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup" class="screen active">
+  <div class="logo">Cold Logic</div>
+  <div class="tagline">formal reasoning · 50 levels · one attempt</div>
+
+  <div class="rank-display">
+    <div class="rank-title" id="setupRank">Novice</div>
+    <div class="rank-sub">current rank</div>
+  </div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>time pressure</label>
+      <div class="toggle-row" style="flex:1">
+        <button class="toggle-btn active" id="timeOff" onclick="setTimed(false)">off</button>
+        <button class="toggle-btn" id="timeOn" onclick="setTimed(true)">on</button>
+      </div>
+    </div>
+    <div class="setting-row" id="timeRow" style="display:none">
+      <label>seconds per puzzle</label>
+      <input type="range" id="slTime" min="10" max="60" step="5" value="30">
+      <span class="setting-val" id="outTime">30s</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">begin</button>
+
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:340px;line-height:2;">
+    levels 1–5 · valid syllogisms<br>
+    levels 6–10 · invalid conclusions · cbd introduced<br>
+    levels 11–50 · coming soon
+  </div>
+</div>
+
+<!-- ══ DRILL ══ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val green" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+    <div class="hud-stat"><div class="val" id="hudTime">—</div><div class="lbl">Time</div></div>
+    <div class="hud-stat"><div class="val" id="hudRank" style="font-size:0.7rem;color:var(--accent2)">Novice</div><div class="lbl">Rank</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-info"></div>
+
+    <div class="puzzle-card" id="puzzleCard">
+      <div class="puzzle-type-label" id="puzzleTypeLabel"></div>
+      <div class="premises" id="premisesEl"></div>
+      <hr class="divider-line">
+      <div class="conclusion-label">therefore</div>
+      <div class="conclusion" id="conclusionEl"></div>
+    </div>
+
+    <div class="answer-btns" id="answerBtns">
+      <button class="ans-btn" id="btnTrue"  onclick="submitAnswer('TRUE')">True</button>
+      <button class="ans-btn" id="btnFalse" onclick="submitAnswer('FALSE')">False</button>
+      <button class="ans-btn" id="btnCBD"   onclick="submitAnswer('CBD')" style="display:none">Cannot Be Determined</button>
+    </div>
+
+    <div id="explanation-panel">
+      <div class="explanation-header" id="explanationHeader">explanation</div>
+      <div class="explanation-text" id="explanationText"></div>
+      <div class="logic-principle" id="logicPrinciple"></div>
+      <button class="continue-btn" id="continueBtn">continue →</button>
+    </div>
+
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══ CLEAR ══ -->
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title">cleared</div>
+  <div class="clear-rank" id="clearRank"></div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ press space or tap to continue</div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="gameover" class="screen">
+  <div class="go-title">incorrect</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new personal record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.6rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">try again</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// RANKS
+// ══════════════════════════════════════════════════
+
+const RANKS = [
+  { level: 1,  title: 'Novice' },
+  { level: 6,  title: 'Sophist' },
+  { level: 11, title: 'Dialectician' },
+  { level: 21, title: 'Logician' },
+  { level: 31, title: 'Rationalist' },
+  { level: 41, title: 'Cold Logician' },
+];
+
+function getRank(level) {
+  let rank = RANKS[0].title;
+  for (const r of RANKS) { if (level >= r.level) rank = r.title; }
+  return rank;
+}
+
+// ══════════════════════════════════════════════════
+// PUZZLE ENGINE — PROGRAMMATIC TEMPLATES
+// ══════════════════════════════════════════════════
+
+// Noun pools for template substitution
+const POOLS = {
+  // [category, plural, singular]
+  animals: [
+    ['mammals','mammal'],['birds','bird'],['reptiles','reptile'],
+    ['insects','insect'],['fish','fish'],['amphibians','amphibian'],
+  ],
+  specific_animals: [
+    ['dogs','dog','Rex'],['cats','cat','Whiskers'],['eagles','eagle','Aria'],
+    ['sharks','shark','Finn'],['frogs','frog','Pip'],['wolves','wolf','Grey'],
+    ['horses','horse','Storm'],['owls','owl','Hoot'],['bears','bear','Bruno'],
+    ['penguins','penguin','Percy'],['ravens','raven','Edgar'],['foxes','fox','Vix'],
+  ],
+  people: [
+    ['philosophers','philosopher','Socrates'],
+    ['scientists','scientist','Elena'],
+    ['poets','poet','Marcus'],
+    ['mathematicians','mathematician','Anya'],
+    ['historians','historian','James'],
+    ['doctors','doctor','Chen'],
+    ['musicians','musician','Lena'],
+    ['architects','architect','Carlo'],
+  ],
+  properties_positive: [
+    'mortal','fallible','creative','curious','disciplined',
+    'observant','methodical','patient','analytical',
+  ],
+  properties_food: [
+    ['fruits','fruit','an apple'],['vegetables','vegetable','a carrot'],
+    ['grains','grain','wheat'],['legumes','legume','a lentil'],
+  ],
+  cities: ['Paris','Tokyo','Rome','Cairo','Sydney','Oslo','Lima','Seoul'],
+  traits: [
+    ['warm-blooded','cold-blooded'],['vertebrates','invertebrates'],
+    ['carnivores','herbivores'],['nocturnal','diurnal'],
+  ],
+};
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function pickTwo(arr) {
+  const i = Math.floor(Math.random() * arr.length);
+  let j = Math.floor(Math.random() * (arr.length - 1));
+  if (j >= i) j++;
+  return [arr[i], arr[j]];
+}
+
+// ══════════════════════════════════════════════════
+// PUZZLE GENERATORS — LEVELS 1–10
+// ══════════════════════════════════════════════════
+
+// Level 1–5: Valid categorical syllogisms → answer always TRUE
+// Barbara form: All A are B. X is an A. Therefore X is a B.
+function genBarbaraSyllogism() {
+  const [spec] = [pick(POOLS.specific_animals)];
+  const prop = pick(POOLS.properties_positive);
+  const category = pick(POOLS.animals);
+  // All [category] are [prop]. [Name] is a [singular category]. Therefore [Name] is [prop].
+  return {
+    premises: [
+      `All ${category[0]} are ${prop}.`,
+      `${spec[2]} is a ${spec[1]}.`,
+      `All ${spec[0]} are ${category[0]}.`,
+    ],
+    conclusion: `${spec[2]} is ${prop}.`,
+    answer: 'TRUE',
+    explanation: `The argument follows a chain of categorical reasoning. Since all ${spec[0]} are ${category[0]}, and all ${category[0]} are ${prop}, it necessarily follows that ${spec[2]} — being a ${spec[1]} — is ${prop}. The conclusion cannot be denied without contradicting the premises.`,
+    principle: 'Valid categorical syllogism — Barbara form (All A are B; All B are C; therefore All A are C)',
+    type: 'categorical syllogism',
+  };
+}
+
+// Celarent form: No A are B. X is A. Therefore X is not B.
+function genCelarentSyllogism() {
+  const spec = pick(POOLS.specific_animals);
+  const [trait1, trait2] = pick(POOLS.traits);
+  return {
+    premises: [
+      `No ${trait1} creatures are ${trait2}.`,
+      `All ${spec[0]} are ${trait1}.`,
+      `${spec[2]} is a ${spec[1]}.`,
+    ],
+    conclusion: `${spec[2]} is not ${trait2}.`,
+    answer: 'TRUE',
+    explanation: `Since no ${trait1} creature can be ${trait2}, and ${spec[2]} is a ${spec[1]} — which is ${trait1} — the conclusion follows with certainty. The universal negative in the first premise excludes all members of the first category from the second.`,
+    principle: 'Valid categorical syllogism — Celarent form (No A are B; All C are A; therefore No C are B)',
+    type: 'categorical syllogism',
+  };
+}
+
+// Darii form: All A are B. Some C are A. Therefore some C are B.
+function genDariiSyllogism() {
+  const prop = pick(POOLS.properties_positive);
+  const [cat1, cat2] = pickTwo(POOLS.animals);
+  return {
+    premises: [
+      `All ${cat1[0]} are ${prop}.`,
+      `Some ${cat2[0]} are ${cat1[0]}.`,
+    ],
+    conclusion: `Some ${cat2[0]} are ${prop}.`,
+    answer: 'TRUE',
+    explanation: `Because all ${cat1[0]} are ${prop}, and at least some ${cat2[0]} belong to the category of ${cat1[0]}, those particular ${cat2[0]} must also be ${prop}. The partial membership is enough to guarantee the conclusion.`,
+    principle: 'Valid categorical syllogism — Darii form (All A are B; Some C are A; therefore Some C are B)',
+    type: 'categorical syllogism',
+  };
+}
+
+// Simple transitive: All A are B. All B are C. Therefore all A are C.
+function genTransitiveSyllogism() {
+  const [cat1, cat2] = pickTwo(POOLS.animals);
+  const prop = pick(POOLS.properties_positive);
+  return {
+    premises: [
+      `All ${cat1[0]} are ${cat2[0]}.`,
+      `All ${cat2[0]} are ${prop}.`,
+    ],
+    conclusion: `All ${cat1[0]} are ${prop}.`,
+    answer: 'TRUE',
+    explanation: `This is a straightforward transitive chain. The first premise places all ${cat1[0]} inside the category of ${cat2[0]}. The second places all ${cat2[0]} among the ${prop}. The intersection is complete — every ${cat1[1]} is necessarily ${prop}.`,
+    principle: 'Hypothetical syllogism / transitive categorical reasoning',
+    type: 'categorical syllogism',
+  };
+}
+
+// People + property
+function genPeopleSyllogism() {
+  const person = pick(POOLS.people);
+  const prop = pick(POOLS.properties_positive);
+  return {
+    premises: [
+      `All ${person[0]} are ${prop}.`,
+      `${person[2]} is a ${person[1]}.`,
+    ],
+    conclusion: `${person[2]} is ${prop}.`,
+    answer: 'TRUE',
+    explanation: `The argument is structurally valid. Every member of the category "${person[0]}" is ${prop} by the first premise. ${person[2]} is placed within that category by the second. The conclusion is inescapable.`,
+    principle: 'Valid categorical syllogism — Barbara form',
+    type: 'categorical syllogism',
+  };
+}
+
+// ── LEVELS 6–10: Invalid / CBD ──
+
+// Undistributed middle: All A are C. All B are C. Therefore All A are B. → FALSE
+function genUndistributedMiddle() {
+  const [cat1, cat2] = pickTwo(POOLS.animals);
+  const prop = pick(POOLS.properties_positive);
+  return {
+    premises: [
+      `All ${cat1[0]} are ${prop}.`,
+      `All ${cat2[0]} are ${prop}.`,
+    ],
+    conclusion: `All ${cat1[0]} are ${cat2[0]}.`,
+    answer: 'FALSE',
+    explanation: `Both categories share the property of being ${prop}, but sharing a trait does not make them the same thing. ${cat1[0].charAt(0).toUpperCase() + cat1[0].slice(1)} and ${cat2[0]} are distinct categories that happen to overlap with a third. The middle term ("${prop}") is undistributed — it never covers the full extent of either category.`,
+    principle: 'Fallacy of the undistributed middle term',
+    type: 'invalid syllogism',
+  };
+}
+
+// Illicit minor: All A are B. All A are C. Therefore All B are C. → FALSE
+function genIllicitMinor() {
+  const [cat1, cat2] = pickTwo(POOLS.animals);
+  const prop = pick(POOLS.properties_positive);
+  return {
+    premises: [
+      `All ${cat1[0]} are ${prop}.`,
+      `All ${cat1[0]} are ${cat2[0]}.`,
+    ],
+    conclusion: `All ${prop} things are ${cat2[0]}.`,
+    answer: 'FALSE',
+    explanation: `The premises only tell us about ${cat1[0]}. We cannot conclude anything about all ${prop} things, because there may be ${prop} things that are not ${cat1[0]} — and therefore not necessarily ${cat2[0]}. The minor term is used in a broader sense in the conclusion than it was in the premises.`,
+    principle: 'Fallacy of the illicit minor term',
+    type: 'invalid syllogism',
+  };
+}
+
+// Some A are B. X is A. Therefore X is B. → CBD
+function genSomeFallacyCBD() {
+  const spec = pick(POOLS.specific_animals);
+  const prop = pick(POOLS.properties_positive);
+  const [cat] = [pick(POOLS.animals)];
+  return {
+    premises: [
+      `Some ${spec[0]} are ${prop}.`,
+      `${spec[2]} is a ${spec[1]}.`,
+    ],
+    conclusion: `${spec[2]} is ${prop}.`,
+    answer: 'CBD',
+    explanation: `"Some" means at least one — not all. Just because some ${spec[0]} are ${prop} does not mean every individual ${spec[1]} is. ${spec[2]} might be among the ${prop} ones, or might not. The premises do not give us enough information to decide either way.`,
+    principle: 'Cannot be determined — existential fallacy / quantifier scope error',
+    type: 'invalid syllogism (CBD)',
+  };
+}
+
+// No A are B. Some C are A. Therefore no C are B. → FALSE (should be: some C are not B)
+function genNegativeSomeFallacy() {
+  const [cat1, cat2] = pickTwo(POOLS.animals);
+  const prop = pick(POOLS.properties_positive);
+  return {
+    premises: [
+      `No ${cat1[0]} are ${prop}.`,
+      `Some ${cat2[0]} are ${cat1[0]}.`,
+    ],
+    conclusion: `No ${cat2[0]} are ${prop}.`,
+    answer: 'FALSE',
+    explanation: `The premises only establish that some ${cat2[0]} — specifically those that are also ${cat1[0]} — are not ${prop}. Other ${cat2[0]} that are not ${cat1[0]} may well be ${prop}. The conclusion overclaims by extending the negative judgment to all ${cat2[0]}.`,
+    principle: 'Illicit negative — overgeneralising from a partial membership',
+    type: 'invalid syllogism',
+  };
+}
+
+// All A are B. X is not A. Therefore X is not B. → CBD (denying the antecedent preview)
+function genDenyingAntecedentPreviewCBD() {
+  const person = pick(POOLS.people);
+  const prop = pick(POOLS.properties_positive);
+  return {
+    premises: [
+      `All ${person[0]} are ${prop}.`,
+      `${person[2]} is not a ${person[1]}.`,
+    ],
+    conclusion: `${person[2]} is not ${prop}.`,
+    answer: 'CBD',
+    explanation: `The first premise tells us that being a ${person[1]} is sufficient for being ${prop} — but it does not say it is the only way to be ${prop}. ${person[2]} might be ${prop} for entirely different reasons. We simply cannot tell from these premises.`,
+    principle: 'Cannot be determined — previews the fallacy of denying the antecedent',
+    type: 'invalid syllogism (CBD)',
+  };
+}
+
+// ══════════════════════════════════════════════════
+// LEVEL CONFIG
+// ══════════════════════════════════════════════════
+
+// Pool of generators per level group
+const LEVEL_POOLS = {
+  // Levels 1-5: valid syllogisms only (TRUE answers)
+  1: [genBarbaraSyllogism, genCelarentSyllogism, genPeopleSyllogism, genTransitiveSyllogism, genDariiSyllogism],
+  2: [genBarbaraSyllogism, genCelarentSyllogism, genPeopleSyllogism, genTransitiveSyllogism, genDariiSyllogism],
+  3: [genBarbaraSyllogism, genTransitiveSyllogism, genDariiSyllogism, genCelarentSyllogism, genPeopleSyllogism],
+  4: [genTransitiveSyllogism, genDariiSyllogism, genBarbaraSyllogism, genCelarentSyllogism, genPeopleSyllogism],
+  5: [genBarbaraSyllogism, genCelarentSyllogism, genTransitiveSyllogism, genDariiSyllogism, genPeopleSyllogism],
+  // Levels 6-10: invalid / CBD (CBD button appears)
+  6: [genUndistributedMiddle, genIllicitMinor, genSomeFallacyCBD, genNegativeSomeFallacy, genDenyingAntecedentPreviewCBD],
+  7: [genUndistributedMiddle, genSomeFallacyCBD, genDenyingAntecedentPreviewCBD, genIllicitMinor, genNegativeSomeFallacy],
+  8: [genUndistributedMiddle, genIllicitMinor, genNegativeSomeFallacy, genSomeFallacyCBD, genDenyingAntecedentPreviewCBD],
+  9: [genSomeFallacyCBD, genDenyingAntecedentPreviewCBD, genUndistributedMiddle, genNegativeSomeFallacy, genIllicitMinor],
+  10:[genNegativeSomeFallacy, genUndistributedMiddle, genDenyingAntecedentPreviewCBD, genSomeFallacyCBD, genIllicitMinor],
+};
+
+const TOTAL_LEVELS = 10; // will grow
+
+function generatePuzzle(levelIndex) {
+  const pool = LEVEL_POOLS[levelIndex + 1];
+  if (!pool) return null;
+  const gen = pick(pool);
+  return gen();
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR MESSAGES
+// ══════════════════════════════════════════════════
+
+const CLEAR_MESSAGES = [
+  "Valid syllogisms. The simplest form of necessary inference.",
+  "Structural validity confirmed. The premises compel the conclusion.",
+  "Three valid forms mastered. Transitivity is second nature.",
+  "The chain holds. You are following the argument.",
+  "All five valid forms. You reason with necessity.",
+  "Invalid conclusions distinguished. The first fallacy falls.",
+  "You are identifying what the premises cannot support.",
+  "CBD requires precision — knowing what you do not know.",
+  "Nine levels. The structure of argument is becoming visible.",
+  "Ten levels of Cold Logic complete. The real curriculum begins.",
+];
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let timedMode = false;
+let timePerPuzzle = 30;
+let currentLevel = 0;
+let streak = 0;
+let sessionLog = [];
+let sessionStart = null;
+let waitingForClear = false;
+let phase = 'idle';
+let currentPuzzle = null;
+let timerAnimFrame = null;
+let promptStart = 0;
+let waitingForContinue = false;
+let continueAction = null; // function to call on continue
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('clBestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('clBestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('clBestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('clBestStreak', v); refreshBest(); }
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent  = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+  document.getElementById('setupRank').textContent  = getRank(bl);
+}
+
+// ══════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setTimed(val) {
+  timedMode = val;
+  document.getElementById('timeOn').classList.toggle('active', val);
+  document.getElementById('timeOff').classList.toggle('active', !val);
+  document.getElementById('timeRow').style.display = val ? 'flex' : 'none';
+}
+
+function setAnswerBtns(enabled) {
+  ['btnTrue','btnFalse','btnCBD'].forEach(id => {
+    document.getElementById(id).disabled = !enabled;
+  });
+}
+
+function showCBDBtn(visible) {
+  document.getElementById('btnCBD').style.display = visible ? 'block' : 'none';
+}
+
+function resetAnswerBtns() {
+  ['btnTrue','btnFalse','btnCBD'].forEach(id => {
+    const btn = document.getElementById(id);
+    btn.classList.remove('selected-correct','selected-wrong','reveal-correct');
+    btn.disabled = false;
+  });
+}
+
+function updateProgressBar() {
+  const pct = Math.min(100, Math.round((currentLevel / TOTAL_LEVELS) * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-info').textContent =
+    `level ${currentLevel + 1} of ${TOTAL_LEVELS} · ${getRank(currentLevel + 1)}`;
+}
+
+function renderPuzzle(puzzle) {
+  document.getElementById('puzzleTypeLabel').textContent = puzzle.type;
+  const premisesEl = document.getElementById('premisesEl');
+  premisesEl.innerHTML = puzzle.premises.map((p, i) =>
+    `<div class="premise"><span class="premise-num">${i+1}.</span>${p}</div>`
+  ).join('');
+  document.getElementById('conclusionEl').textContent = puzzle.conclusion;
+  document.getElementById('explanation-panel').classList.remove('visible');
+  resetAnswerBtns();
+  showCBDBtn(currentLevel >= 5); // CBD appears from level 6 onward
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  show('drill');
+  nextPuzzle();
+}
+
+function nextPuzzle() {
+  phase = 'question';
+  clearTimers();
+  waitingForContinue = false;
+
+  currentPuzzle = generatePuzzle(currentLevel);
+  if (!currentPuzzle) { showGameOver(); return; }
+
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('hudRank').textContent = getRank(currentLevel + 1);
+  document.getElementById('level-info').textContent =
+    `level ${currentLevel + 1} · ${currentPuzzle.type}`;
+
+  renderPuzzle(currentPuzzle);
+  setAnswerBtns(true);
+  updateProgressBar();
+
+  if (timedMode) {
+    promptStart = performance.now();
+    startTimer();
+  } else {
+    document.getElementById('timer-bar').style.width = '100%';
+    document.getElementById('timer-bar').style.background = 'var(--green)';
+    document.getElementById('hudTime').textContent = '—';
+  }
+}
+
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  function tick() {
+    const elapsed = (performance.now() - promptStart) / 1000;
+    const left = Math.max(0, timePerPuzzle - elapsed);
+    const pct = left / timePerPuzzle;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    document.getElementById('hudTime').textContent = Math.ceil(left) + 's';
+    if (left > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else submitAnswer('TIMEOUT');
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+function submitAnswer(userAnswer) {
+  if (phase !== 'question') return;
+  clearTimers();
+  phase = 'feedback';
+  setAnswerBtns(false);
+
+  const correct = currentPuzzle.answer;
+  const isCorrect = userAnswer === correct;
+  const isTimeout = userAnswer === 'TIMEOUT';
+
+  // Visual feedback on buttons
+  const btnMap = { TRUE: 'btnTrue', FALSE: 'btnFalse', CBD: 'btnCBD' };
+  if (!isTimeout && btnMap[userAnswer]) {
+    document.getElementById(btnMap[userAnswer]).classList.add(
+      isCorrect ? 'selected-correct' : 'selected-wrong'
+    );
+  }
+  if (!isCorrect && btnMap[correct]) {
+    document.getElementById(btnMap[correct]).classList.add('reveal-correct');
+    document.getElementById(btnMap[correct]).disabled = false;
+  }
+
+  sessionLog.push({ level: currentLevel + 1, answer: userAnswer, correct: isCorrect });
+
+  if (isCorrect) {
+    streak++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('hudStreak').textContent = streak;
+
+    // Show brief explanation then auto-advance
+    showExplanation(true, isTimeout);
+    setTimeout(() => {
+      if (phase !== 'feedback') return;
+      currentLevel++;
+      if (currentLevel >= TOTAL_LEVELS) { showClear(); return; }
+      nextPuzzle();
+    }, 2000);
+
+  } else {
+    streak = 0;
+    document.getElementById('hudStreak').textContent = 0;
+    // Show explanation and wait for Continue button
+    showExplanation(false, isTimeout);
+    continueAction = () => showGameOver();
+  }
+}
+
+function showExplanation(isCorrect, isTimeout) {
+  const panel = document.getElementById('explanation-panel');
+  panel.classList.add('visible');
+
+  const header = document.getElementById('explanationHeader');
+  header.textContent = isCorrect ? 'correct' : (isTimeout ? 'time expired' : 'incorrect');
+  header.style.color = isCorrect ? 'var(--green)' : 'var(--danger)';
+
+  document.getElementById('explanationText').textContent = currentPuzzle.explanation;
+  document.getElementById('logicPrinciple').textContent = currentPuzzle.principle;
+
+  const continueBtn = document.getElementById('continueBtn');
+  if (isCorrect) {
+    continueBtn.style.display = 'none';
+  } else {
+    continueBtn.style.display = 'block';
+  }
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════
+
+function showClear() {
+  const lvl = currentLevel;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `${lvl} levels complete`;
+  document.getElementById('clearRank').textContent = getRank(lvl);
+  document.getElementById('clearMsg').textContent =
+    CLEAR_MESSAGES[Math.min(lvl - 1, CLEAR_MESSAGES.length - 1)];
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  show('drill');
+  nextPuzzle();
+}
+
+// ══════════════════════════════════════════════════
+// GAME OVER
+// ══════════════════════════════════════════════════
+
+function showGameOver() {
+  phase = 'idle';
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} puzzles · ${correct} correct · streak peak: ${getBestStreak()}`;
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#d4af6a','#c8a96e','#7c9eb2','#6dba8a','#d8d4cc'];
+  const particles = Array.from({length: 60}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5,
+    vx: (Math.random()-0.5)*3, vy: Math.random()*2.5+0.5,
+    size: Math.random()*4+1, color: pick(colors),
+    alpha: 1, rot: Math.random()*Math.PI*2, rotv: (Math.random()-0.5)*0.15
+  }));
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height); let alive=false;
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.04; p.alpha-=0.007; p.rot+=p.rotv;
+      if (p.alpha>0) {
+        alive=true; ctx.save(); ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color;
+        ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); ctx.restore();
+      }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('slTime').addEventListener('input', function() {
+  timePerPuzzle = parseInt(this.value);
+  document.getElementById('outTime').textContent = this.value + 's';
+});
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => { clearTimers(); show('setup'); });
+
+document.getElementById('continueBtn').addEventListener('click', () => {
+  if (continueAction) { continueAction(); continueAction = null; }
+});
+
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.getElementById('clear').classList.contains('active')) {
+    e.preventDefault(); proceedFromClear();
+  }
+});
+
+// init
+refreshBest();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
