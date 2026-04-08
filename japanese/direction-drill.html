@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Direction Drill — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --sakura: #ff6b9d;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--sakura), var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(255,107,157,0.4));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(255,107,157,0.3)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(255,107,157,0.7)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 28px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 140px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--sakura); }
+.setting-val { font-size: 0.75rem; color: var(--sakura); min-width: 40px; text-align: right; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--sakura); background: transparent;
+  color: var(--sakura); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--sakura); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #fff; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* level overview table */
+.level-overview {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 4px 12px;
+  width: min(340px, 90vw);
+  font-size: 0.55rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.level-overview .lnum { color: var(--sakura); font-family: 'Bebas Neue', sans-serif; font-size: 0.8rem; }
+.level-overview .ldesc { color: var(--muted); }
+.level-overview .lq { color: var(--muted); text-align: right; }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .val.sakura { color: var(--sakura); }
+.hud-stat .lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+#timer-bar-bg { width: 100%; height: 4px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--sakura); transition: width 0.3s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 24px; padding: 20px;
+  width: 100%; max-width: 500px; margin: 0 auto;
+}
+
+#level-badge { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; line-height: 1.8; }
+
+/* main word display */
+#word-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 180px;
+  justify-content: center;
+}
+
+#word-text {
+  font-size: clamp(5rem, 22vw, 10rem);
+  line-height: 1;
+  text-align: center;
+  color: var(--text);
+  transition: opacity 0.1s;
+  /* Japanese text rendering */
+  font-family: 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 40px rgba(255,107,157,0.15);
+  min-height: 1.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#word-text.audio-mode {
+  font-size: clamp(3rem, 15vw, 7rem);
+  color: var(--sakura);
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 30px rgba(255,107,157,0.4);
+}
+
+/* play button for audio mode */
+#play-audio-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.2em;
+  padding: 10px 28px; border: 1px solid var(--sakura); background: transparent;
+  color: var(--sakura); cursor: pointer; border-radius: 2px; transition: all 0.15s;
+  display: none;
+}
+#play-audio-btn:hover { background: var(--sakura); color: #fff; }
+#play-audio-btn.visible { display: block; }
+
+/* arrow key hint display */
+.arrow-hint {
+  display: grid;
+  grid-template-areas:
+    ". up ."
+    "left . right"
+    ". down .";
+  gap: 6px;
+  width: 120px;
+}
+.arrow-key {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 4px;
+  text-align: center;
+  transition: all 0.1s;
+  user-select: none;
+}
+.arrow-key[data-dir="up"]    { grid-area: up; }
+.arrow-key[data-dir="left"]  { grid-area: left; }
+.arrow-key[data-dir="right"] { grid-area: right; }
+.arrow-key[data-dir="down"]  { grid-area: down; }
+.arrow-key.flash-correct { background: var(--green); border-color: var(--green); color: #000; }
+.arrow-key.flash-wrong   { background: var(--danger); border-color: var(--danger); color: #fff; }
+.arrow-key.in-pool { border-color: var(--muted); color: var(--text); }
+
+/* feedback */
+#feedback-area { text-align: center; min-height: 40px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#feedback-msg { font-size: 0.85rem; letter-spacing: 0.08em; }
+.fb-ok  { color: var(--green); }
+.fb-err { color: var(--danger); }
+
+#progress-info { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── CLEAR ── */
+#clear { gap: 12px; text-align: center; background: var(--bg); position: relative; overflow: hidden; }
+#clear-particles { position: absolute; inset: 0; pointer-events: none; }
+.clear-label { font-size: 0.75rem; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+.clear-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  background: linear-gradient(135deg, var(--gold), var(--sakura));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(255,107,157,0.5));
+  animation: clearpop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes clearpop { 0%{transform:scale(0.2) rotate(-5deg);opacity:0} 100%{transform:scale(1) rotate(0);opacity:1} }
+.clear-msg { font-size: 0.8rem; color: var(--text); letter-spacing: 0.08em; max-width: 320px; line-height: 1.9; }
+.clear-next { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-wrong { font-size: 1.5rem; color: var(--muted); margin: 4px 0; font-family: 'Hiragino Sans','Yu Gothic','Noto Sans JP',sans-serif; }
+.go-wrong span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup" class="screen active">
+  <div class="logo">方向</div>
+  <div class="tagline">direction drill — みぎ · ひだり · うえ · した</div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>time limit (lvl 11+)</label>
+      <input type="range" id="slTime" min="0.5" max="5" step="0.5" value="2">
+      <span class="setting-val" id="outTime">2.0s</span>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:min(340px,90vw)">
+    <div class="section-label">level structure</div>
+    <div class="level-overview">
+      <span class="lnum">1</span><span class="ldesc">kana · みぎ/ひだり only</span><span class="lq">20q</span>
+      <span class="lnum">2</span><span class="ldesc">kana · うえ/した only</span><span class="lq">20q</span>
+      <span class="lnum">3</span><span class="ldesc">kana · all four</span><span class="lq">30q</span>
+      <span class="lnum">4</span><span class="ldesc">kanji · 右/左 only</span><span class="lq">20q</span>
+      <span class="lnum">5</span><span class="ldesc">kanji · 上/下 only</span><span class="lq">20q</span>
+      <span class="lnum">6</span><span class="ldesc">kanji · all four</span><span class="lq">30q</span>
+      <span class="lnum">7</span><span class="ldesc">mixed kanji/kana · all four</span><span class="lq">30q</span>
+      <span class="lnum">8</span><span class="ldesc">audio · right/left only</span><span class="lq">20q</span>
+      <span class="lnum">9</span><span class="ldesc">audio · up/down only</span><span class="lq">20q</span>
+      <span class="lnum">10</span><span class="ldesc">audio · all four</span><span class="lq">30q</span>
+      <span class="lnum">11+</span><span class="ldesc">kanji · timed · 95% per level</span><span class="lq">30q</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start climbing</button>
+</div>
+
+<!-- ══ DRILL ══ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val sakura" id="hudMode">kana</div><div class="lbl">Mode</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">20</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-badge"></div>
+
+    <div id="word-display">
+      <div id="word-text"></div>
+      <button id="play-audio-btn">▶ play again</button>
+    </div>
+
+    <div class="arrow-hint">
+      <div class="arrow-key" data-dir="up" id="key-up">↑</div>
+      <div class="arrow-key" data-dir="left" id="key-left">←</div>
+      <div class="arrow-key" data-dir="right" id="key-right">→</div>
+      <div class="arrow-key" data-dir="down" id="key-down">↓</div>
+    </div>
+
+    <div id="feedback-area">
+      <div id="feedback-msg"></div>
+    </div>
+
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══ CLEAR ══ -->
+<div id="clear" class="screen">
+  <canvas id="clear-particles"></canvas>
+  <div class="clear-label" id="clearLabel">Level 1 Complete</div>
+  <div class="clear-title" id="clearTitle">CLEARED!</div>
+  <div class="clear-msg" id="clearMsg"></div>
+  <div class="clear-next">▶ tap or press space to continue</div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="gameover" class="screen">
+  <div class="go-title">wrong</div>
+  <div class="go-wrong" id="goWrong"></div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.7rem;color:var(--muted)"></div>
+  <div class="go-btns">
+    <button class="go-btn primary" id="retryBtn">▶ try again</button>
+    <button class="go-btn" id="menuBtn">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════
+
+const DIRS = {
+  right: { kana: 'みぎ', kanji: '右', arrow: 'ArrowRight', key: 'key-right', audio: 'words/右.mp3' },
+  left:  { kana: 'ひだり', kanji: '左', arrow: 'ArrowLeft',  key: 'key-left',  audio: 'words/左.mp3' },
+  up:    { kana: 'うえ', kanji: '上', arrow: 'ArrowUp',    key: 'key-up',    audio: 'words/上.mp3' },
+  down:  { kana: 'した', kanji: '下', arrow: 'ArrowDown',  key: 'key-down',  audio: 'words/下.mp3' },
+};
+
+const LEVELS = [
+  // Phase 1: kana
+  { mode: 'kana',  pool: ['right','left'],         needed: 20, desc: 'kana · みぎ/ひだり',    timed: false },
+  { mode: 'kana',  pool: ['up','down'],             needed: 20, desc: 'kana · うえ/した',      timed: false },
+  { mode: 'kana',  pool: ['right','left','up','down'], needed: 30, desc: 'kana · all four',   timed: false },
+  // Phase 2: kanji
+  { mode: 'kanji', pool: ['right','left'],          needed: 20, desc: 'kanji · 右/左',         timed: false },
+  { mode: 'kanji', pool: ['up','down'],             needed: 20, desc: 'kanji · 上/下',         timed: false },
+  { mode: 'kanji', pool: ['right','left','up','down'], needed: 30, desc: 'kanji · all four',  timed: false },
+  // Phase 3: mixed
+  { mode: 'mixed', pool: ['right','left','up','down'], needed: 30, desc: 'mixed · all four',  timed: false },
+  // Phase 4: audio
+  { mode: 'audio', pool: ['right','left'],          needed: 20, desc: 'audio · right/left',   timed: false },
+  { mode: 'audio', pool: ['up','down'],             needed: 20, desc: 'audio · up/down',      timed: false },
+  { mode: 'audio', pool: ['right','left','up','down'], needed: 30, desc: 'audio · all four',  timed: false },
+];
+
+// Level 11+ generated dynamically (timed, all four, kanji)
+function getTimedLevel(levelIndex) {
+  // levelIndex 10, 11, 12... → timedIndex 0, 1, 2...
+  const timedIndex = levelIndex - 10;
+  const timeLimit = baseTime * Math.pow(0.95, timedIndex);
+  return {
+    mode: 'kanji',
+    pool: ['right','left','up','down'],
+    needed: 30,
+    desc: `kanji · timed · ${timeLimit.toFixed(2)}s`,
+    timed: true,
+    timeLimit,
+  };
+}
+
+function getLevelDef(levelIndex) {
+  if (levelIndex < LEVELS.length) return LEVELS[levelIndex];
+  return getTimedLevel(levelIndex);
+}
+
+// ══════════════════════════════════════════════════
+// AUDIO
+// ══════════════════════════════════════════════════
+
+const audioCache = {};
+function getAudio(dir) {
+  if (!audioCache[dir]) audioCache[dir] = new Audio(DIRS[dir].audio);
+  return audioCache[dir];
+}
+function preloadAudio() {
+  Object.keys(DIRS).forEach(d => getAudio(d));
+}
+function playAudio(dir) {
+  const a = getAudio(dir);
+  a.currentTime = 0;
+  a.play().catch(() => {});
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let baseTime = 2.0;
+let currentLevel = 0;
+let levelDone = 0;
+let streak = 0;
+let sessionLog = [];
+let sessionStart = null;
+let waitingForClear = false;
+let phase = 'idle';
+
+let currentDir = null;
+let lastDir = null;
+let guaranteeBag = [];
+let timerAnimFrame = null;
+let promptStart = 0;
+let totalTime = 2.0;
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('dirBestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('dirBestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('dirBestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('dirBestStreak', v); refreshBest(); }
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent  = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+}
+
+// ══════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','clear','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function refillBag(pool) {
+  let bag = shuffle([...pool]);
+  if (lastDir && bag.length > 1 && bag[0] === lastDir) {
+    const j = Math.floor(Math.random()*(bag.length-1))+1;
+    [bag[0],bag[j]]=[bag[j],bag[0]];
+  }
+  return bag;
+}
+
+function pickDir(pool) {
+  if (guaranteeBag.length === 0) guaranteeBag = refillBag(pool);
+  let pick = guaranteeBag.shift();
+  if (lastDir && pick === lastDir && pool.length > 1) {
+    if (guaranteeBag.length === 0) guaranteeBag = refillBag(pool);
+    guaranteeBag.push(pick);
+    pick = guaranteeBag.shift();
+  }
+  return pick;
+}
+
+function getDisplayText(dir, mode) {
+  if (mode === 'kana')  return DIRS[dir].kana;
+  if (mode === 'kanji') return DIRS[dir].kanji;
+  if (mode === 'mixed') return Math.random() < 0.5 ? DIRS[dir].kanji : DIRS[dir].kana;
+  return ''; // audio
+}
+
+function updatePoolKeys(pool) {
+  ['right','left','up','down'].forEach(d => {
+    const el = document.getElementById(DIRS[d].key);
+    el.classList.toggle('in-pool', pool.includes(d));
+  });
+}
+
+function flashKey(dir, type) {
+  const el = document.getElementById(DIRS[dir].key);
+  el.classList.add(type === 'correct' ? 'flash-correct' : 'flash-wrong');
+  setTimeout(() => {
+    el.classList.remove('flash-correct','flash-wrong');
+  }, 200);
+}
+
+function updateProgressBar() {
+  const lv = getLevelDef(currentLevel);
+  const pct = Math.min(100, Math.round(levelDone / lv.needed * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('hudDone').textContent = levelDone;
+  document.getElementById('hudNeeded').textContent = lv.needed;
+  document.getElementById('progress-info').textContent =
+    `${levelDone} / ${lv.needed} · level ${currentLevel+1} · ${lv.desc}`;
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  currentLevel = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  preloadAudio();
+  show('drill');
+  startLevel();
+}
+
+function startLevel() {
+  levelDone = 0;
+  lastDir = null;
+  guaranteeBag = [];
+  const lv = getLevelDef(currentLevel);
+
+  document.getElementById('hudLevel').textContent = currentLevel + 1;
+  document.getElementById('hudMode').textContent = lv.mode;
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('level-badge').textContent = `level ${currentLevel+1} · ${lv.desc}`;
+
+  updatePoolKeys(lv.pool);
+  updateProgressBar();
+  nextQuestion();
+}
+
+function nextQuestion() {
+  phase = 'question';
+  clearTimers();
+  const lv = getLevelDef(currentLevel);
+  currentDir = pickDir(lv.pool);
+  lastDir = currentDir;
+
+  // Render word
+  const wordEl = document.getElementById('word-text');
+  const audioBtn = document.getElementById('play-audio-btn');
+
+  if (lv.mode === 'audio') {
+    wordEl.textContent = '♪';
+    wordEl.className = 'audio-mode';
+    audioBtn.classList.add('visible');
+    playAudio(currentDir);
+  } else {
+    wordEl.textContent = getDisplayText(currentDir, lv.mode);
+    wordEl.className = '';
+    audioBtn.classList.remove('visible');
+  }
+
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = '';
+  updateProgressBar();
+
+  if (lv.timed) {
+    totalTime = lv.timeLimit;
+    promptStart = performance.now();
+    startTimer();
+  } else {
+    document.getElementById('timer-bar').style.width = '100%';
+    document.getElementById('timer-bar').style.background = 'var(--green)';
+  }
+}
+
+function startTimer() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+  function tick() {
+    const elapsed = (performance.now() - promptStart) / 1000;
+    const left = Math.max(0, totalTime - elapsed);
+    const pct = left / totalTime;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct*100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    if (left > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else handleWrong('timeout', null);
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+function handleKeyPress(arrow) {
+  if (phase !== 'question') return;
+
+  const correct = DIRS[currentDir].arrow;
+  const pressedDir = Object.keys(DIRS).find(d => DIRS[d].arrow === arrow);
+
+  if (arrow === correct) {
+    clearTimers();
+    flashKey(currentDir, 'correct');
+    phase = 'feedback';
+    streak++;
+    levelDone++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('hudStreak').textContent = streak;
+    document.getElementById('feedback-msg').textContent = '';
+    updateProgressBar();
+
+    sessionLog.push({ level: currentLevel+1, dir: currentDir, correct: true });
+
+    const lv = getLevelDef(currentLevel);
+    if (levelDone >= lv.needed) {
+      setTimeout(showClear, 300);
+    } else {
+      setTimeout(nextQuestion, 200);
+    }
+  } else {
+    clearTimers();
+    if (pressedDir) flashKey(pressedDir, 'wrong');
+    handleWrong('wrong', arrow);
+  }
+}
+
+function handleWrong(reason, pressedArrow) {
+  phase = 'feedback';
+  clearTimers();
+  streak = 0;
+  document.getElementById('hudStreak').textContent = 0;
+  document.getElementById('timer-bar').style.width = '0%';
+
+  sessionLog.push({ level: currentLevel+1, dir: currentDir, correct: false, reason });
+
+  // Show what the correct answer was on game over screen
+  const lv = getLevelDef(currentLevel);
+  const wordShown = lv.mode === 'audio' ? '♪' :
+    lv.mode === 'mixed' ? `${DIRS[currentDir].kanji} / ${DIRS[currentDir].kana}` :
+    getDisplayText(currentDir, lv.mode);
+
+  setTimeout(() => showGameOver(wordShown, currentDir, reason), 400);
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════
+
+const CLEAR_MESSAGES = [
+  "みぎ and ひだり. The horizontal axis is yours.",
+  "うえ and した. Four directions known.",
+  "All four in kana. The sounds are in your hands.",
+  "右 and 左 in kanji. The characters are taking shape.",
+  "上 and 下. Four kanji recognised.",
+  "All four kanji. The written form is automatic.",
+  "Mixed kanji and kana. Your brain handles both.",
+  "Audio right/left. Your ear is leading now.",
+  "Audio up/down. Pure listening.",
+  "All four by ear. Direction drill complete.",
+  "Speed begins. The clock is watching.",
+  "Faster. No gap between sound and response.",
+  "Legendary speed. Pure reflex.",
+];
+
+function getClearMsg(lvl) {
+  return CLEAR_MESSAGES[Math.min(lvl-1, CLEAR_MESSAGES.length-1)];
+}
+
+function showClear() {
+  const lvl = currentLevel + 1;
+  if (lvl > getBestLevel()) saveBestLevel(lvl);
+  document.getElementById('clearLabel').textContent = `Level ${lvl} complete`;
+  document.getElementById('clearTitle').textContent =
+    lvl >= 10 ? 'LEGENDARY!' : lvl >= 7 ? 'BLAZING!' : lvl >= 4 ? 'SHARP!' : 'CLEARED!';
+  document.getElementById('clearMsg').textContent = getClearMsg(lvl);
+  waitingForClear = true;
+  show('clear');
+  spawnParticles();
+}
+
+function proceedFromClear() {
+  if (!waitingForClear) return;
+  waitingForClear = false;
+  currentLevel++;
+  show('drill');
+  startLevel();
+}
+
+// ══════════════════════════════════════════════════
+// GAME OVER
+// ══════════════════════════════════════════════════
+
+function showGameOver(wordShown, correctDir, reason) {
+  phase = 'idle';
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+
+  const correctArrow = { right:'→', left:'←', up:'↑', down:'↓' }[correctDir];
+  document.getElementById('goWrong').innerHTML =
+    `<span style="font-size:2rem">${wordShown}</span>&nbsp;&nbsp;<span style="color:var(--gold)">${correctArrow}</span>`;
+
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} questions · ${correct} correct · streak peak: ${getBestStreak()}`;
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+function spawnParticles() {
+  const canvas = document.getElementById('clear-particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#ffd700','#ff6b9d','#00f5ff','#ff006e','#00ff88'];
+  const particles = Array.from({length:80}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5,
+    vx: (Math.random()-0.5)*4, vy: Math.random()*3+1,
+    size: Math.random()*6+2, color: colors[Math.floor(Math.random()*colors.length)],
+    alpha: 1, rot: Math.random()*Math.PI*2, rotv: (Math.random()-0.5)*0.2
+  }));
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height); let alive=false;
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.alpha-=0.008; p.rot+=p.rotv;
+      if (p.alpha>0) {
+        alive=true; ctx.save(); ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color;
+        ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); ctx.restore();
+      }
+    });
+    if (alive) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('slTime').addEventListener('input', function() {
+  baseTime = parseFloat(this.value);
+  document.getElementById('outTime').textContent = baseTime.toFixed(1) + 's';
+});
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn').addEventListener('click', startSession);
+document.getElementById('menuBtn').addEventListener('click', () => { clearTimers(); show('setup'); });
+document.getElementById('play-audio-btn').addEventListener('click', () => {
+  if (currentDir) playAudio(currentDir);
+});
+
+document.getElementById('clear').addEventListener('click', proceedFromClear);
+document.addEventListener('keydown', e => {
+  if (['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key)) {
+    e.preventDefault();
+    if (document.getElementById('drill').classList.contains('active')) {
+      handleKeyPress(e.key);
+    }
+  }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (document.getElementById('clear').classList.contains('active')) proceedFromClear();
+  }
+});
+
+// Mobile arrow buttons
+['up','down','left','right'].forEach(dir => {
+  document.getElementById(`key-${dir}`).addEventListener('click', () => {
+    handleKeyPress(DIRS[dir].arrow);
+  });
+});
+
+// init
+refreshBest();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
