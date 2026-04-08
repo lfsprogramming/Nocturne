@@ -270,6 +270,11 @@ body::after {
       <input type="range" id="slTime" min="0.5" max="5" step="0.5" value="2">
       <span class="setting-val" id="outTime">2.0s</span>
     </div>
+    <div class="setting-row">
+      <label>starting level</label>
+      <input type="range" id="slStartLevel" min="1" max="11" step="1" value="1">
+      <span class="setting-val" id="outStartLevel">1</span>
+    </div>
   </div>
 
   <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:min(340px,90vw)">
@@ -356,10 +361,10 @@ body::after {
 // ══════════════════════════════════════════════════
 
 const DIRS = {
-  right: { kana: 'みぎ', kanji: '右', arrow: 'ArrowRight', key: 'key-right', audio: 'words/右.mp3' },
-  left:  { kana: 'ひだり', kanji: '左', arrow: 'ArrowLeft',  key: 'key-left',  audio: 'words/左.mp3' },
-  up:    { kana: 'うえ', kanji: '上', arrow: 'ArrowUp',    key: 'key-up',    audio: 'words/上.mp3' },
-  down:  { kana: 'した', kanji: '下', arrow: 'ArrowDown',  key: 'key-down',  audio: 'words/下.mp3' },
+  right: { kana: 'みぎ', kanji: '右', arrow: 'ArrowRight', key: 'key-right', audio: 'words/migi.mp3' },
+  left:  { kana: 'ひだり', kanji: '左', arrow: 'ArrowLeft',  key: 'key-left',  audio: 'words/hidari.mp3' },
+  up:    { kana: 'うえ', kanji: '上', arrow: 'ArrowUp',    key: 'key-up',    audio: 'words/ue.mp3' },
+  down:  { kana: 'した', kanji: '下', arrow: 'ArrowDown',  key: 'key-down',  audio: 'words/shita.mp3' },
 };
 
 const LEVELS = [
@@ -422,6 +427,7 @@ function playAudio(dir) {
 // ══════════════════════════════════════════════════
 
 let baseTime = 2.0;
+let startingLevel = 0; // 0-indexed
 let currentLevel = 0;
 let levelDone = 0;
 let streak = 0;
@@ -535,7 +541,7 @@ function updateProgressBar() {
 // ══════════════════════════════════════════════════
 
 function startSession() {
-  currentLevel = 0;
+  currentLevel = startingLevel;
   streak = 0;
   sessionLog = [];
   sessionStart = new Date();
@@ -798,6 +804,10 @@ document.getElementById('slTime').addEventListener('input', function() {
   baseTime = parseFloat(this.value);
   document.getElementById('outTime').textContent = baseTime.toFixed(1) + 's';
 });
+document.getElementById('slStartLevel').addEventListener('input', function() {
+  startingLevel = parseInt(this.value) - 1; // convert to 0-indexed
+  document.getElementById('outStartLevel').textContent = this.value;
+});
 
 document.getElementById('startBtn').addEventListener('click', startSession);
 document.getElementById('retryBtn').addEventListener('click', startSession);
@@ -834,6 +844,6 @@ document.addEventListener('keydown', e => {
 // init
 refreshBest();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.3</div>
+<div style="position:fixed;bottom:8px;right:10px;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.5</div>
 </body>
 </html>
