@@ -1176,7 +1176,14 @@ function endClinic() {
 // EVENTS
 // ══════════════════════════════════════════════════
 
-document.getElementById('startPaceBtn').addEventListener('click', startPaceDrill);
+document.getElementById('startPaceBtn').addEventListener('click', () => {
+  try {
+    startPaceDrill();
+  } catch(e) {
+    console.error('[ColdType] startPaceDrill error:', e);
+    alert('Error starting drill: ' + e.message);
+  }
+});
 
 // WPM input — number field, update on change
 document.getElementById('slWpm').addEventListener('input', function() {
