@@ -841,6 +841,14 @@ document.addEventListener('keydown', e => {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       placingWhite = !placingWhite;
+      // If there's a piece on the selected square, flip its color immediately
+      if (selectedSq !== null && playerBoard[selectedSq]) {
+        const current = playerBoard[selectedSq];
+        playerBoard[selectedSq] = placingWhite
+          ? current.toUpperCase()
+          : current.toLowerCase();
+        renderPlayerBoard();
+      }
       updateColorIndicator();
       return;
     }
@@ -871,6 +879,6 @@ document.getElementById('retryBtn') && document.getElementById('retryBtn').addEv
 refreshBest();
 updateColorIndicator();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.2</div>
 </body>
 </html>
