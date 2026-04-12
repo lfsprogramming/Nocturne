@@ -151,8 +151,15 @@ body::after {
   font-size: inherit;
   line-height: 1;
   pointer-events: none;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
   transition: opacity 0.3s;
+}
+.piece.white-piece {
+  color: #f0e6c8;
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px #000);
+}
+.piece.black-piece {
+  color: #1a1a2e;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 1px 2px rgba(0,0,0,0.8));
 }
 .piece.fade-out { opacity: 0; }
 
@@ -317,10 +324,13 @@ body::after {
 // FEN piece codes: uppercase = white, lowercase = black
 // P=pawn, R=rook, N=knight, B=bishop, Q=queen, K=king
 
-const PIECE_UNICODE = {
-  // white
-  'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
-  // black
+// FEN piece codes: uppercase = white, lowercase = black
+// We use solid black Unicode symbols for ALL pieces, then color with CSS
+// White pieces = light ivory color with dark outline
+// Black pieces = dark charcoal color with light outline
+
+const PIECE_SYMBOL = {
+  'P': '♟', 'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚',
   'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
 };
 
@@ -396,33 +406,36 @@ function generatePosition(numPieces) {
   const board = emptyBoard();
   const usedSquares = new Set();
 
-  // Decide dominant color (white or black has more pieces)
-  // With numPieces pieces, roughly 60% one color, 40% other
-  const whiteCount = Math.ceil(numPieces * (0.5 + (Math.random() * 0.2)));
+  // Proper random split: shuffle an array of colors
+  // e.g. 2 pieces → [W,B] shuffled; 3 pieces → [W,W,B] or [W,B,B] randomly
+  const assignments = [];
+  const whiteCount = Math.floor(numPieces / 2) + (Math.random() < 0.5 ? 0 : numPieces % 2 === 0 ? 0 : 1);
   const blackCount = numPieces - whiteCount;
+  for (let i = 0; i < whiteCount; i++) assignments.push(true);
+  for (let i = 0; i < blackCount; i++) assignments.push(false);
+  // Shuffle
+  for (let i = assignments.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [assignments[i], assignments[j]] = [assignments[j], assignments[i]];
+  }
 
-  let placed = 0;
   let attempts = 0;
-
-  function placeGroup(count, isWhite) {
-    let groupPlaced = 0;
-    while (groupPlaced < count && attempts < 500) {
+  for (let i = 0; i < numPieces; i++) {
+    const isWhite = assignments[i];
+    let placed = false;
+    while (!placed && attempts < 500) {
       attempts++;
       const sq = Math.floor(Math.random() * 64);
       if (usedSquares.has(sq)) continue;
-      const rank = Math.floor(sq / 8); // 0=rank8, 7=rank1
+      const rank = Math.floor(sq / 8);
       let type = weightedPiece();
-      // No pawns on rank 1 (index 56-63) or rank 8 (index 0-7)
       if (type === 'P' && (rank === 0 || rank === 7)) continue;
       const piece = isWhite ? type : type.toLowerCase();
       board[sq] = piece;
       usedSquares.add(sq);
-      groupPlaced++;
+      placed = true;
     }
   }
-
-  placeGroup(whiteCount, true);
-  placeGroup(blackCount, false);
 
   return boardToFen(board);
 }
@@ -554,8 +567,9 @@ function renderBoard(board, showPieces = true, fadeOut = false) {
 
     if (showPieces && board[i]) {
       const pieceEl = document.createElement('div');
-      pieceEl.className = 'piece' + (fadeOut ? ' fade-out' : '');
-      pieceEl.textContent = PIECE_UNICODE[board[i]] || '';
+      const isWhite = board[i] === board[i].toUpperCase();
+      pieceEl.className = 'piece ' + (isWhite ? 'white-piece' : 'black-piece') + (fadeOut ? ' fade-out' : '');
+      pieceEl.textContent = PIECE_SYMBOL[board[i]] || '';
       sq.appendChild(pieceEl);
     }
   }
@@ -581,12 +595,13 @@ function showResultOverlay(targetBoard, playerBrd) {
         sq.classList.add('correct-sq');
       } else {
         sq.classList.add('wrong-sq');
-        // Show correct piece
+        // Show correct piece with reduced opacity
         if (target) {
           const pieceEl = document.createElement('div');
-          pieceEl.className = 'piece';
-          pieceEl.textContent = PIECE_UNICODE[target] || '';
-          pieceEl.style.opacity = '0.6';
+          const isWhite = target === target.toUpperCase();
+          pieceEl.className = 'piece ' + (isWhite ? 'white-piece' : 'black-piece');
+          pieceEl.textContent = PIECE_SYMBOL[target] || '';
+          pieceEl.style.opacity = '0.7';
           sq.appendChild(pieceEl);
         }
       }
@@ -599,11 +614,19 @@ function showResultOverlay(targetBoard, playerBrd) {
 // ══════════════════════════════════════════════════
 
 function updateColorIndicator() {
-  const piece = placingWhite ? '♙' : '♟';
-  const name = placingWhite ? 'white' : 'black';
-  document.getElementById('ciPiece').textContent = piece;
-  document.getElementById('ciName').textContent = name;
-  document.getElementById('ciName').style.color = placingWhite ? '#e8e8f0' : '#a0a0c0';
+  const pieceEl = document.getElementById('ciPiece');
+  pieceEl.textContent = '♟';
+  if (placingWhite) {
+    pieceEl.style.color = '#f0e6c8';
+    pieceEl.style.filter = 'drop-shadow(0 0 1px #000)';
+    document.getElementById('ciName').textContent = 'white';
+    document.getElementById('ciName').style.color = '#f0e6c8';
+  } else {
+    pieceEl.style.color = '#1a1a2e';
+    pieceEl.style.filter = 'drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #aaa)';
+    document.getElementById('ciName').textContent = 'black';
+    document.getElementById('ciName').style.color = '#a0a0c0';
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -848,6 +871,6 @@ document.getElementById('retryBtn') && document.getElementById('retryBtn').addEv
 refreshBest();
 updateColorIndicator();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
 </body>
 </html>
