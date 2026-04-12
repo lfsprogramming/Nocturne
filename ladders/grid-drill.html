@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Grid Drill — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --text: #e8e8f0;
+  --muted: #404060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(0,245,255,0.4));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(0,245,255,0.3)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(0,245,255,0.7)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+/* mode toggle */
+.mode-toggle { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; width: min(340px, 90vw); }
+.mode-btn {
+  flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 10px 0; border: none; background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.mode-btn.active { background: var(--accent); color: #000; font-weight: 700; }
+
+/* grid size toggle */
+.grid-toggle { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; width: min(340px, 90vw); }
+.grid-btn {
+  flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 10px 0; border: none; background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.grid-btn.active { background: var(--accent2); color: #fff; font-weight: 700; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 150px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.setting-val { font-size: 0.75rem; color: var(--accent); min-width: 44px; text-align: right; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl { font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+
+#timer-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--green); transition: background 0.1s; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 14px; padding: 12px;
+}
+
+#level-badge { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; }
+
+/* ── GRID ── */
+#grid-wrap { position: relative; }
+
+#grid {
+  display: grid;
+  gap: 2px;
+}
+
+.cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.cell.lit {
+  transform: scale(1.04);
+}
+
+/* ── ANSWER BUTTONS ── */
+#answer-area {
+  display: flex; gap: 16px; justify-content: center;
+  min-height: 52px; align-items: center;
+}
+
+.ans-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.1em;
+  padding: 10px 36px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  cursor: pointer; border-radius: 2px; transition: all 0.12s;
+  min-width: 100px; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.ans-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,245,255,0.05); }
+.ans-btn.correct { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.08); }
+.ans-btn.wrong   { border-color: var(--danger); color: var(--danger); background: rgba(255,0,60,0.08); }
+.ans-btn.hidden  { opacity: 0; pointer-events: none; }
+
+/* observe label shown while grid is lit */
+#observe-label {
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase;
+  min-height: 16px; text-align: center;
+}
+
+#feedback-msg {
+  font-size: 0.8rem; letter-spacing: 0.1em; min-height: 20px; text-align: center;
+}
+.fb-ok  { color: var(--green); }
+.fb-err { color: var(--danger); }
+
+#progress-info { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-press { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; margin-top: 8px; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup" class="screen active">
+  <div class="logo">Grid Drill</div>
+  <div class="tagline">subitize · count · remember</div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevelCount">—</div><div class="blbl">Count Best</div></div>
+    <div class="best-item"><div class="bval" id="bestStreakCount">—</div><div class="blbl">Count Streak</div></div>
+    <div class="best-item"><div class="bval" id="bestLevelMem">—</div><div class="blbl">Memory Best</div></div>
+    <div class="best-item"><div class="bval" id="bestStreakMem">—</div><div class="blbl">Memory Streak</div></div>
+  </div>
+
+  <!-- Mode -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:min(340px,90vw)">
+    <div class="section-label">mode</div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="modeCount" onclick="setMode('count')">Counting</button>
+      <button class="mode-btn" id="modeMem" onclick="setMode('memory')">Memory</button>
+    </div>
+  </div>
+
+  <!-- Grid size -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:min(340px,90vw)">
+    <div class="section-label">grid size</div>
+    <div class="grid-toggle">
+      <button class="grid-btn" id="grid10" onclick="setGrid(10)">10×10</button>
+      <button class="grid-btn" id="grid15" onclick="setGrid(15)">15×15</button>
+      <button class="grid-btn active" id="grid20" onclick="setGrid(20)">20×20</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+
+    <!-- Counting mode settings -->
+    <div id="countSettings">
+      <div class="setting-row">
+        <label>time limit per pattern</label>
+        <input type="range" id="slCountTime" min="3" max="30" step="1" value="10">
+        <span class="setting-val" id="outCountTime">10s</span>
+      </div>
+    </div>
+
+    <!-- Memory mode settings -->
+    <div id="memSettings" style="display:none">
+      <div class="setting-row">
+        <label>display duration</label>
+        <input type="range" id="slMemTime" min="0.5" max="5" step="0.5" value="1">
+        <span class="setting-val" id="outMemTime">1.0s</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start</button>
+
+  <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:320px;line-height:1.9;">
+    counting · grid stays lit · time pressure · pick correct count<br>
+    memory · grid flashes · answer after dark · pick correct count<br>
+    level 20+ · 5% compression per level · wrong = game over
+  </div>
+</div>
+
+<!-- ══ DRILL ══ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val green" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+    <div class="hud-stat"><div class="val" id="hudMode">count</div><div class="lbl">Mode</div></div>
+    <div class="hud-stat"><div class="val" id="hudTime">—</div><div class="lbl">Time</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-badge"></div>
+    <div id="grid-wrap"><div id="grid"></div></div>
+    <div id="observe-label"></div>
+    <div id="answer-area">
+      <button class="ans-btn hidden" id="btnLeft"  onclick="handleAnswer('left')">—</button>
+      <button class="ans-btn hidden" id="btnRight" onclick="handleAnswer('right')">—</button>
+    </div>
+    <div id="feedback-msg"></div>
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="gameover" class="screen">
+  <div class="go-title">wrong</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat">streak <span id="goStreak">0</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.65rem;color:var(--muted)"></div>
+  <div class="go-press">press space or tap to try again</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// SETTINGS STATE
+// ══════════════════════════════════════════════════
+
+let mode = 'count';       // 'count' | 'memory'
+let gridSize = 20;        // 10, 15, or 20
+let countBaseTime = 10;   // seconds per pattern (counting)
+let memBaseTime = 1.0;    // seconds display duration (memory)
+
+// Detect mobile default
+if (window.innerWidth <= 600) {
+  gridSize = 10;
+  document.getElementById('grid10').classList.add('active');
+  document.getElementById('grid20').classList.remove('active');
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('modeCount').classList.toggle('active', m === 'count');
+  document.getElementById('modeMem').classList.toggle('active', m === 'memory');
+  document.getElementById('countSettings').style.display = m === 'count' ? 'block' : 'none';
+  document.getElementById('memSettings').style.display   = m === 'memory' ? 'block' : 'none';
+}
+
+function setGrid(size) {
+  gridSize = size;
+  [10,15,20].forEach(s => document.getElementById('grid'+s).classList.toggle('active', s === size));
+}
+
+document.getElementById('slCountTime').addEventListener('input', function() {
+  countBaseTime = parseInt(this.value);
+  document.getElementById('outCountTime').textContent = this.value + 's';
+});
+document.getElementById('slMemTime').addEventListener('input', function() {
+  memBaseTime = parseFloat(this.value);
+  document.getElementById('outMemTime').textContent = parseFloat(this.value).toFixed(1) + 's';
+});
+
+// ══════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════
+
+let level = 1;
+let streak = 0;
+let correctAnswer = 0;
+let sessionLog = [];
+let sessionStart = null;
+let phase = 'idle'; // 'observe' | 'answer' | 'feedback' | 'idle'
+let timerAnimFrame = null;
+let promptStart = 0;
+let currentTimeLimit = 0;
+let cells = [];
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function storKey(type) {
+  return `gridDrill_${type}_${mode}`;
+}
+function getBestLevel()  { return parseInt(localStorage.getItem(storKey('bestLevel'))  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem(storKey('bestStreak')) || '0'); }
+function saveBestLevel(v)  { localStorage.setItem(storKey('bestLevel'),  v); }
+function saveBestStreak(v) { localStorage.setItem(storKey('bestStreak'), v); }
+
+function refreshBest() {
+  const savedMode = mode;
+  mode = 'count';
+  document.getElementById('bestLevelCount').textContent  = getBestLevel()  || '—';
+  document.getElementById('bestStreakCount').textContent = getBestStreak() || '—';
+  mode = 'memory';
+  document.getElementById('bestLevelMem').textContent    = getBestLevel()  || '—';
+  document.getElementById('bestStreakMem').textContent   = getBestStreak() || '—';
+  mode = savedMode;
+}
+
+// ══════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  cells = [];
+
+  // Calculate cell size to fit screen
+  const maxW = Math.min(window.innerWidth - 32, window.innerHeight - 180);
+  const cellSize = Math.floor((maxW - gridSize * 2) / gridSize);
+  const clampedCell = Math.max(8, Math.min(cellSize, 32));
+
+  grid.style.gridTemplateColumns = `repeat(${gridSize}, ${clampedCell}px)`;
+  grid.style.gridTemplateRows    = `repeat(${gridSize}, ${clampedCell}px)`;
+
+  const total = gridSize * gridSize;
+  for (let i = 0; i < total; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.width  = clampedCell + 'px';
+    cell.style.height = clampedCell + 'px';
+    grid.appendChild(cell);
+    cells.push(cell);
+  }
+}
+
+function clearGrid() {
+  cells.forEach(c => {
+    c.style.backgroundColor = '';
+    c.classList.remove('lit');
+  });
+}
+
+function randomPastel() {
+  const r = Math.floor(Math.random() * 127) + 127;
+  const g = Math.floor(Math.random() * 127) + 127;
+  const b = Math.floor(Math.random() * 127) + 127;
+  return `rgb(${r},${g},${b})`;
+}
+
+function getLitCount() {
+  // Start at 3 cells for level 1, grow with level
+  const base = 3 + Math.floor((level - 1) * 0.8);
+  const variance = Math.min(3, Math.floor(level / 5));
+  const min = Math.max(2, base - variance);
+  const max = base + variance;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getTimeLimit() {
+  if (level < 20) return mode === 'count' ? countBaseTime : memBaseTime;
+  const decayLevels = level - 19;
+  const base = mode === 'count' ? countBaseTime : memBaseTime;
+  return base * Math.pow(0.95, decayLevels);
+}
+
+function litGrid() {
+  clearGrid();
+  correctAnswer = getLitCount();
+  const total = gridSize * gridSize;
+  const litSet = new Set();
+  while (litSet.size < correctAnswer) litSet.add(Math.floor(Math.random() * total));
+  litSet.forEach(i => {
+    cells[i].style.backgroundColor = randomPastel();
+    cells[i].classList.add('lit');
+  });
+}
+
+function setAnswerButtons(visible, leftVal, rightVal) {
+  const bl = document.getElementById('btnLeft');
+  const br = document.getElementById('btnRight');
+  if (visible) {
+    bl.textContent = leftVal;
+    br.textContent = rightVal;
+    bl.classList.remove('hidden','correct','wrong');
+    br.classList.remove('hidden','correct','wrong');
+  } else {
+    bl.classList.add('hidden');
+    br.classList.add('hidden');
+  }
+}
+
+function buildAnswerPair() {
+  const wrong = correctAnswer + (Math.random() < 0.5 ? 1 : -1);
+  if (Math.random() < 0.5) {
+    return { left: correctAnswer, right: wrong };
+  } else {
+    return { left: wrong, right: correctAnswer };
+  }
+}
+
+function updateHud() {
+  document.getElementById('hudLevel').textContent  = level;
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('hudMode').textContent   = mode === 'count' ? 'count' : 'mem';
+}
+
+function updateProgressInfo() {
+  const tl = getTimeLimit();
+  const tlStr = mode === 'count'
+    ? `${tl.toFixed(1)}s to count`
+    : `${tl.toFixed(2)}s display`;
+  document.getElementById('progress-info').textContent =
+    `level ${level} · streak ${streak} · ${tlStr}`;
+}
+
+// ══════════════════════════════════════════════════
+// TIMER
+// ══════════════════════════════════════════════════
+
+function startTimer(duration, onExpire) {
+  clearTimers();
+  promptStart = performance.now();
+  currentTimeLimit = duration;
+  function tick() {
+    const elapsed = (performance.now() - promptStart) / 1000;
+    const left = Math.max(0, duration - elapsed);
+    const pct = left / duration;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--green)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    document.getElementById('hudTime').textContent = left.toFixed(1) + 's';
+    if (left > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else onExpire();
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+function resetTimerBar() {
+  clearTimers();
+  document.getElementById('timer-bar').style.width = '100%';
+  document.getElementById('timer-bar').style.background = 'var(--green)';
+  document.getElementById('hudTime').textContent = '—';
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  level = 1;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  buildGrid();
+  show('drill');
+  updateHud();
+  nextRound();
+}
+
+function nextRound() {
+  phase = 'observe';
+  clearTimers();
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = '';
+  setAnswerButtons(false);
+  updateHud();
+  updateProgressInfo();
+
+  litGrid();
+
+  const tl = getTimeLimit();
+
+  if (mode === 'count') {
+    // Grid stays lit, timer counts down, then time-out = game over
+    document.getElementById('observe-label').textContent = 'count the lit cells';
+    document.getElementById('level-badge').textContent = `level ${level} · counting`;
+
+    // Show answer buttons immediately in counting mode
+    const pair = buildAnswerPair();
+    setAnswerButtons(true, pair.left, pair.right);
+    phase = 'answer';
+
+    startTimer(tl, () => {
+      // Timeout = wrong
+      handleTimeout();
+    });
+
+  } else {
+    // Memory mode: grid lights up for tl seconds, then goes dark, then buttons appear
+    document.getElementById('observe-label').textContent = 'memorise the pattern';
+    document.getElementById('level-badge').textContent = `level ${level} · memory`;
+    resetTimerBar();
+
+    // Show countdown during display
+    const displayStart = performance.now();
+    function displayTick() {
+      const elapsed = (performance.now() - displayStart) / 1000;
+      const left = Math.max(0, tl - elapsed);
+      document.getElementById('hudTime').textContent = left.toFixed(2) + 's';
+      if (left > 0) timerAnimFrame = requestAnimationFrame(displayTick);
+      else {
+        // Grid goes dark
+        clearGrid();
+        document.getElementById('observe-label').textContent = 'how many were lit?';
+        document.getElementById('hudTime').textContent = '—';
+        document.getElementById('timer-bar').style.width = '100%';
+        document.getElementById('timer-bar').style.background = 'var(--accent)';
+
+        // Slight pause then show buttons
+        setTimeout(() => {
+          const pair = buildAnswerPair();
+          setAnswerButtons(true, pair.left, pair.right);
+          phase = 'answer';
+        }, 200);
+      }
+    }
+    timerAnimFrame = requestAnimationFrame(displayTick);
+  }
+}
+
+function handleAnswer(side) {
+  if (phase !== 'answer') return;
+  clearTimers();
+  phase = 'feedback';
+
+  const btn = document.getElementById(side === 'left' ? 'btnLeft' : 'btnRight');
+  const otherBtn = document.getElementById(side === 'left' ? 'btnRight' : 'btnLeft');
+  const chosen = parseInt(btn.textContent);
+  const isCorrect = chosen === correctAnswer;
+
+  sessionLog.push({ level, correctAnswer, chosen, correct: isCorrect });
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+    streak++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    // Level up every 10 correct
+    if (streak % 10 === 0) level++;
+    updateHud();
+    document.getElementById('feedback-msg').textContent = 'correct';
+    document.getElementById('feedback-msg').className = 'fb-ok';
+    if (level > getBestLevel()) saveBestLevel(level);
+    setTimeout(nextRound, 700);
+  } else {
+    btn.classList.add('wrong');
+    // Show correct answer
+    if (parseInt(otherBtn.textContent) === correctAnswer) {
+      otherBtn.classList.add('correct');
+    }
+    document.getElementById('feedback-msg').textContent = `wrong — answer was ${correctAnswer}`;
+    document.getElementById('feedback-msg').className = 'fb-err';
+    setTimeout(showGameOver, 1200);
+  }
+}
+
+function handleTimeout() {
+  if (phase !== 'answer') return;
+  clearTimers();
+  phase = 'feedback';
+  document.getElementById('feedback-msg').textContent = `too slow — answer was ${correctAnswer}`;
+  document.getElementById('feedback-msg').className = 'fb-err';
+  document.getElementById('timer-bar').style.width = '0%';
+  sessionLog.push({ level, correctAnswer, chosen: null, correct: false, timeout: true });
+  setTimeout(showGameOver, 1200);
+}
+
+function showGameOver() {
+  phase = 'idle';
+  const best = getBestLevel();
+  const isNew = level > best;
+  if (isNew) saveBestLevel(level);
+  document.getElementById('goLevel').textContent  = level;
+  document.getElementById('goStreak').textContent = streak;
+  document.getElementById('goBest').textContent   = Math.max(level, best) || '—';
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} rounds · ${correct} correct · mode: ${mode}`;
+  refreshBest();
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    if (phase === 'answer') handleAnswer('left');
+  } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    if (phase === 'answer') handleAnswer('right');
+  } else if (e.code === 'Space') {
+    e.preventDefault();
+    if (document.getElementById('gameover').classList.contains('active')) {
+      startSession();
+    }
+  }
+});
+
+document.getElementById('gameover').addEventListener('click', startSession);
+
+// init
+refreshBest();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
