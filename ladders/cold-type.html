@@ -653,6 +653,13 @@ function showSetup() { show('setup'); refreshSetupStats(); renderWeaknessPreview
 // ══════════════════════════════════════════════════
 
 function startPaceDrill() {
+  // Always read current values from inputs at start time
+  const wpmVal = parseInt(document.getElementById('slWpm').value);
+  if (!isNaN(wpmVal)) targetWpm = Math.max(40, Math.min(220, wpmVal));
+  const wordsVal = parseInt(document.getElementById('slWords').value);
+  if (!isNaN(wordsVal)) wordsPerSet = wordsVal;
+  const setsVal = parseInt(document.getElementById('slSets').value);
+  if (!isNaN(setsVal)) setsPerSession = setsVal;
   paceState = {
     currentSet: [],
     currentWordIdx: 0,
@@ -1218,6 +1225,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.1</div>
 </body>
 </html>
