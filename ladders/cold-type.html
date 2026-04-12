@@ -934,11 +934,11 @@ function handleWordSubmit(idx, typedClean, targetClean, targetOriginal) {
     errBigrams.forEach(bg => {
       paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 2;
     });
-    paceState.missedWords.push(target);
+    paceState.missedWords.push(targetOriginal);
     paceState.errors++;
   } else {
     paceState.wordsTyped++;
-    paceState.charsTyped += target.length;
+    paceState.charsTyped += targetOriginal.length;
   }
 
   paceState.currentWordIdx = idx + 1;
@@ -1224,6 +1224,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.2</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.3</div>
 </body>
 </html>
