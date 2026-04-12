@@ -425,19 +425,6 @@ let setsPerSession = 10;
 let includeNumbers = false;
 let includeSymbols = false;
 
-document.getElementById('slWpm').addEventListener('input', function() {
-  targetWpm = parseInt(this.value);
-  document.getElementById('outWpm').textContent = this.value + ' wpm';
-});
-document.getElementById('slWords').addEventListener('input', function() {
-  wordsPerSet = parseInt(this.value);
-  document.getElementById('outWords').textContent = this.value;
-});
-document.getElementById('slSets').addEventListener('input', function() {
-  setsPerSession = parseInt(this.value);
-  document.getElementById('outSets').textContent = this.value;
-});
-
 function toggleInclude(type) {
   if (type === 'numbers') {
     includeNumbers = !includeNumbers;
