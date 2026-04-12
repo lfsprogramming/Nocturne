@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cold Type — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --text: #e8e8f0;
+  --muted: #404060;
+  --dim: #20203a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.5rem, 10vw, 5rem);
+  letter-spacing: 0.2em;
+  background: linear-gradient(135deg, var(--accent), var(--green));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(0,245,255,0.3));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(0,245,255,0.2)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(0,245,255,0.5)); }
+}
+
+.tagline { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -14px; }
+
+.stats-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.stat-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stat-item .sval { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--gold); line-height: 1; }
+.stat-item .slbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(380px, 92vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; min-width: 160px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.setting-val { font-size: 0.75rem; color: var(--accent); min-width: 52px; text-align: right; }
+
+.toggle-row { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; width: min(380px, 92vw); }
+.toggle-btn { flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 0; border: none; background: var(--surface); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.toggle-btn.active { background: var(--accent); color: #000; font-weight: 700; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+.file-btns { display: flex; gap: 10px; }
+.file-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 7px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; border-radius: 2px; transition: all 0.15s; }
+.file-btn:hover { border-color: var(--muted); color: var(--text); }
+.file-btn.accent { border-color: var(--green); color: var(--green); }
+.file-btn.accent:hover { background: var(--green); color: #000; }
+
+/* weakness bar */
+.weakness-preview { width: min(380px, 92vw); }
+.bigram-bars { display: flex; flex-wrap: wrap; gap: 4px; }
+.bigram-bar { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 3px 6px; }
+.bigram-label { font-size: 0.6rem; color: var(--accent); min-width: 20px; }
+.bigram-score { font-size: 0.5rem; color: var(--muted); }
+
+/* ── PACE DRILL ── */
+#pace { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#pace-hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .val.warn  { color: var(--warn); }
+.hud-stat .val.danger{ color: var(--danger); }
+.hud-stat .lbl { font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+
+#pace-progress-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#pace-progress { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
+
+#pace-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 24px; padding: 20px; max-width: 800px; margin: 0 auto; width: 100%;
+}
+
+#pace-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
+
+/* word stream */
+#word-stream {
+  display: flex; flex-direction: column; gap: 8px;
+  width: 100%; max-width: 700px;
+}
+
+.word-row {
+  display: flex; align-items: center; gap: 12px;
+}
+
+.word-timer-bar {
+  height: 3px; background: var(--accent); border-radius: 1px;
+  transition: width linear, background 0.1s;
+  flex-shrink: 0;
+}
+
+.word-display {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  transition: color 0.1s;
+  white-space: nowrap;
+}
+.word-display.current { color: var(--text); }
+.word-display.correct  { color: var(--green); }
+.word-display.missed   { color: var(--danger); text-decoration: line-through; }
+.word-display.upcoming { color: var(--dim); }
+
+/* typing input area */
+#type-area {
+  width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+
+#type-input {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 2px; color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: 1.4rem; padding: 10px 16px; outline: none; letter-spacing: 0.05em;
+  transition: border-color 0.1s;
+  caret-color: var(--accent);
+}
+#type-input:focus { border-color: var(--accent); }
+#type-input.error { border-color: var(--danger); background: rgba(255,0,60,0.05); }
+#type-input.success { border-color: var(--green); }
+
+#rhythm-bar-wrap { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+#rhythm-bar { height: 100%; width: 0%; background: var(--green); border-radius: 3px; transition: width 0.1s, background 0.2s; }
+
+.pace-info { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── CLINIC ── */
+#clinic { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#clinic-hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+
+#clinic-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px; padding: 20px; max-width: 700px; margin: 0 auto; width: 100%;
+}
+
+#clinic-bigram-display {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(3rem, 12vw, 6rem);
+  color: var(--accent2); letter-spacing: 0.3em;
+  text-shadow: 0 0 30px rgba(255,0,110,0.3);
+}
+
+#clinic-words {
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+  max-width: 600px;
+}
+.clinic-word {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.2rem; color: var(--muted); letter-spacing: 0.05em;
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px;
+  background: var(--surface);
+  transition: all 0.1s;
+}
+.clinic-word.current { color: var(--text); border-color: var(--accent); }
+.clinic-word.done    { color: var(--green); border-color: rgba(0,255,136,0.3); }
+.clinic-word.missed  { color: var(--danger); border-color: rgba(255,0,60,0.3); text-decoration: line-through; }
+
+#clinic-input {
+  width: min(400px, 90vw); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 2px; color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: 1.4rem; padding: 10px 16px; outline: none;
+  caret-color: var(--accent2);
+}
+#clinic-input:focus { border-color: var(--accent2); }
+#clinic-input.error { border-color: var(--danger); }
+
+#clinic-progress { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── RESULTS ── */
+#results { gap: 20px; text-align: center; background: var(--bg); overflow-y: auto; padding: 30px 20px; }
+
+.results-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(2rem, 8vw, 4rem);
+  color: var(--gold); letter-spacing: 0.2em;
+}
+
+.results-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px; width: min(500px, 92vw);
+}
+.result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 12px; }
+.result-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--accent); line-height: 1; }
+.result-lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 4px; }
+
+.weakness-title { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+.weakness-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 500px; }
+.weak-chip {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+  padding: 4px 10px; border-radius: 2px; border: 1px solid var(--accent2);
+  color: var(--accent2); background: rgba(255,0,110,0.06);
+}
+.weak-chip.mild { border-color: var(--warn); color: var(--warn); background: rgba(255,149,0,0.06); }
+
+.results-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.res-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.res-btn:hover { background: var(--border); }
+.res-btn.primary { border-color: var(--accent); color: var(--accent); background: transparent; }
+.res-btn.primary:hover { background: var(--accent); color: #000; }
+.res-btn.clinic-btn { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.res-btn.clinic-btn:hover { background: var(--accent2); color: #000; }
+.res-btn.export-btn { border-color: var(--green); color: var(--green); background: transparent; }
+.res-btn.export-btn:hover { background: var(--green); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup" class="screen active">
+  <div class="logo">Cold Type</div>
+  <div class="tagline">pace · bigram · rhythm · 200wpm</div>
+
+  <div class="stats-row">
+    <div class="stat-item"><div class="sval" id="statBestWpm">—</div><div class="slbl">Peak WPM</div></div>
+    <div class="stat-item"><div class="sval" id="statAvgAcc">—</div><div class="slbl">Avg Acc %</div></div>
+    <div class="stat-item"><div class="sval" id="statSessions">—</div><div class="slbl">Sessions</div></div>
+    <div class="stat-item"><div class="sval" id="statWeakCount">—</div><div class="slbl">Weak Bigrams</div></div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">pace drill settings</div>
+    <div class="setting-row">
+      <label>target WPM</label>
+      <input type="range" id="slWpm" min="60" max="220" step="5" value="100">
+      <span class="setting-val" id="outWpm">100 wpm</span>
+    </div>
+    <div class="setting-row">
+      <label>words per set</label>
+      <input type="range" id="slWords" min="4" max="8" step="1" value="5">
+      <span class="setting-val" id="outWords">5</span>
+    </div>
+    <div class="setting-row">
+      <label>sets per session</label>
+      <input type="range" id="slSets" min="5" max="20" step="1" value="10">
+      <span class="setting-val" id="outSets">10</span>
+    </div>
+
+    <div class="section-label" style="margin-top:8px">include</div>
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="togLetters">Letters</button>
+      <button class="toggle-btn" id="togNumbers" onclick="toggleInclude('numbers')">Numbers</button>
+      <button class="toggle-btn" id="togSymbols" onclick="toggleInclude('symbols')">Symbols</button>
+    </div>
+  </div>
+
+  <div class="weakness-preview" id="weaknessPreview" style="display:none">
+    <div class="section-label">known weak bigrams (loaded)</div>
+    <div class="bigram-bars" id="weaknessBars"></div>
+  </div>
+
+  <button class="start-btn" id="startPaceBtn">start pace drill</button>
+
+  <div class="file-btns">
+    <button class="file-btn accent" onclick="exportProfile()">↓ export profile</button>
+    <label class="file-btn" style="cursor:pointer">
+      ↑ import profile
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProfile(event)">
+    </label>
+  </div>
+
+  <div style="font-size:0.52rem;color:var(--muted);letter-spacing:0.08em;text-align:center;max-width:360px;line-height:1.9;">
+    pace drill → words disappear at target speed → type to keep up<br>
+    bigram clinic → targeted practice on your weak pairs<br>
+    profile auto-saves · export to carry between devices
+  </div>
+</div>
+
+<!-- ══ PACE DRILL ══ -->
+<div id="pace" class="screen">
+  <div id="pace-hud">
+    <div class="hud-stat"><div class="val gold" id="hudWpm">0</div><div class="lbl">WPM</div></div>
+    <div class="hud-stat"><div class="val green" id="hudAcc">100%</div><div class="lbl">Acc</div></div>
+    <div class="hud-stat"><div class="val" id="hudSet">1/10</div><div class="lbl">Set</div></div>
+    <div class="hud-stat"><div class="val" id="hudMissed">0</div><div class="lbl">Missed</div></div>
+    <div class="hud-stat"><div class="val" id="hudRhythm">—</div><div class="lbl">Rhythm</div></div>
+  </div>
+  <div id="pace-progress-bg"><div id="pace-progress"></div></div>
+
+  <div id="pace-body">
+    <div id="pace-label">type the current word · keep up with the pace</div>
+
+    <div id="word-stream"></div>
+
+    <div id="type-area">
+      <input id="type-input" type="text" autocomplete="off" autocorrect="off"
+        autocapitalize="off" spellcheck="false" placeholder="start typing...">
+      <div id="rhythm-bar-wrap"><div id="rhythm-bar"></div></div>
+      <div class="pace-info" id="pace-info"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BIGRAM CLINIC ══ -->
+<div id="clinic" class="screen">
+  <div id="clinic-hud">
+    <div class="hud-stat"><div class="val gold" id="cHudBigram">—</div><div class="lbl">Bigram</div></div>
+    <div class="hud-stat"><div class="val green" id="cHudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="cHudTotal">20</div><div class="lbl">Total</div></div>
+    <div class="hud-stat"><div class="val" id="cHudWpm">—</div><div class="lbl">WPM</div></div>
+    <div class="hud-stat"><div class="val" id="cHudAcc">—</div><div class="lbl">Acc</div></div>
+  </div>
+
+  <div id="clinic-body">
+    <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;" id="clinic-label">drilling weak bigram</div>
+    <div id="clinic-bigram-display">--</div>
+    <div id="clinic-words"></div>
+    <input id="clinic-input" type="text" autocomplete="off" autocorrect="off"
+      autocapitalize="off" spellcheck="false" placeholder="type each word...">
+    <div id="clinic-progress"></div>
+  </div>
+</div>
+
+<!-- ══ RESULTS ══ -->
+<div id="results" class="screen">
+  <div class="results-title">session complete</div>
+
+  <div class="results-grid">
+    <div class="result-card"><div class="result-val" id="resWpm">—</div><div class="result-lbl">Peak WPM</div></div>
+    <div class="result-card"><div class="result-val" id="resAcc">—</div><div class="result-lbl">Accuracy</div></div>
+    <div class="result-card"><div class="result-val" id="resRhythm">—</div><div class="result-lbl">Rhythm</div></div>
+    <div class="result-card"><div class="result-val" id="resMissed">—</div><div class="result-lbl">Missed</div></div>
+  </div>
+
+  <div class="weakness-title">bigrams to drill</div>
+  <div class="weakness-list" id="weaknessList"></div>
+
+  <div class="results-btns">
+    <button class="res-btn primary" onclick="startPaceDrill()">pace drill again</button>
+    <button class="res-btn clinic-btn" id="clinicBtn" onclick="startClinic()">bigram clinic</button>
+    <button class="res-btn export-btn" onclick="exportProfile()">↓ export profile</button>
+    <button class="res-btn" onclick="showSetup()">menu</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// WORD LIST
+// ══════════════════════════════════════════════════
+
+const WORDS = ["about","above","across","after","again","against","almost","alone","along","already","also","although","always","among","another","answer","anyone","anything","around","asked","away","back","because","been","before","being","below","between","both","bring","build","came","cannot","carried","carry","cause","change","children","close","comes","coming","could","course","dark","days","dead","death","deep","done","door","down","each","early","earth","eight","either","else","enough","even","ever","every","face","fact","fall","family","feel","feet","fell","felt","find","fire","first","five","floor","follow","food","force","form","four","from","full","gave","general","give","given","goes","going","good","great","group","grow","half","hand","hard","have","head","hear","heart","held","help","here","high","himself","home","hope","hour","house","human","hundred","idea","important","inside","into","itself","join","just","keep","kind","king","knew","know","land","large","last","late","later","learn","leave","left","less","life","light","like","line","little","live","long","look","love","made","main","make","many","mark","matter","maybe","mean","meet","might","mind","miss","money","more","most","move","much","must","name","near","need","never","next","night","note","nothing","notice","number","often","once","only","open","order","other","outside","over","own","part","past","path","people","place","plan","play","point","power","present","problem","pull","push","quite","read","real","reason","rest","right","road","room","round","rule","said","same","school","seem","seen","self","send","sense","seven","shall","short","show","side","since","single","six","size","small","some","soon","sort","sound","space","stand","start","state","stay","step","still","stop","story","such","sure","take","tell","than","that","their","them","then","there","these","they","thing","think","this","those","three","through","time","together","told","took","town","tree","true","turn","under","until","upon","used","very","voice","walk","want","warm","water","ways","well","went","were","what","when","where","whether","which","while","white","whole","whose","wide","will","wind","wish","with","within","without","woman","women","word","work","world","would","write","year","years","your","able","action","actual","advice","afford","afraid","agent","agree","ahead","alarm","album","alert","allow","alter","anger","angle","angry","animal","apply","argue","arise","armor","arrow","aside","asset","assist","assume","attach","attack","attend","avoid","award","aware","badly","basic","basis","battle","beach","began","begin","belief","bench","brief","broke","brown","built","burst","buyer","cabin","catch","cease","chair","cheap","check","chess","chief","child","claim","class","clean","clear","click","climb","clock","cloud","coast","color","comic","cover","craft","crazy","cream","creek","crime","cross","crowd","cruel","crush","curve","cycle","daily","dance","dealt","delay","depth","dirty","doubt","draft","drain","drama","dress","drink","drive","drove","dying","eager","eaten","elect","empty","ended","enemy","enjoy","enter","entry","equal","error","essay","event","exact","exist","extra","faint","faith","false","fancy","fatal","fault","favor","feast","fence","fever","fiber","field","fifth","fifty","fight","filed","final","fixed","flash","flesh","float","flood","flour","focus","forge","forth","found","frame","frank","fraud","freed","fresh","front","froze","fruit","fully","funny","games","ghost","giant","glass","globe","gloom","glove","goals","grace","grade","grain","grand","grant","graph","grasp","grass","grave","greet","grief","groan","gross","guard","guess","guest","guide","guild","guilt","habit","happy","harsh","haven","heads","heard","heavy","hence","herbs","hills","hired","honor","horse","hotel","hours","hover","humor","hurry","image","imply","index","inner","input","issue","ivory","judge","juice","jumps","keeps","knife","knock","label","labor","lance","laser","laugh","layer","legal","level","limit","links","liver","local","logic","loose","lover","lower","lucky","lunch","lying","magic","major","manor","march","match","media","mercy","merit","metal","minor","minus","mixed","model","mourn","mouth","moved","movie","music","naive","nerve","noise","north","novel","nurse","offer","older","olive","onset","outer","owner","oxide","pages","panic","paper","peace","penny","phone","photo","piece","pilot","pitch","pixel","plain","plane","plant","plate","plaza","plead","pluck","poem","point","polar","pound","press","price","pride","prime","print","prior","prize","probe","prove","queen","query","quest","queue","quick","quiet","quota","quote","radar","radio","raise","rally","range","rapid","ratio","reach","ready","realm","rebel","refer","reign","relax","reply","rider","ridge","risky","river","robot","rocky","rouge","rough","route","royal","ruins","ruler","rural","safer","saint","sauce","saved","scale","scare","scene","scope","score","scout","seize","serve","shake","shame","share","sharp","shift","shine","shoot","shore","shout","sight","sixth","skill","sleep","slice","slide","slope","smart","smell","smile","smoke","snake","solar","solid","solve","sorry","south","spare","spark","speak","speed","spend","spent","spill","split","spoke","staff","stage","stain","stake","stamp","stark","stays","steal","steam","steep","steer","stern","stick","stiff","stock","stone","store","storm","stout","stove","strap","straw","stray","strip","stuck","study","stuff","style","sugar","suite","sunny","surge","swift","swing","sword","table","taste","teach","tears","teeth","tenth","terms","tests","theme","thick","thorn","threw","throw","tight","timer","tired","title","today","token","total","touch","tough","tower","toxic","trade","trail","train","trait","trash","treat","trend","trial","tribe","trick","tried","troop","truck","truly","trunk","trust","truth","twice","twist","tying","ultra","uncle","union","unite","unity","upper","upset","urban","usage","usual","utter","valid","value","valve","video","vigor","viral","virus","visit","vital","vivid","vocal","voter","waste","watch","weary","weird","wider","witch","worry","worse","worst","worth","wrath","yacht","yield","young","youth"];
+
+const NUMBERS = ["0","1","2","3","4","5","6","7","8","9","10","12","15","20","25","30","42","50","100","200","365","2024","1000"];
+const SYMBOLS = [",",".",";","'","-","!","?","(",")",":"];
+
+// Build bigram index
+const BIGRAM_INDEX = {};
+for (const word of WORDS) {
+  for (let i = 0; i < word.length - 1; i++) {
+    const bg = word[i] + word[i+1];
+    if (!BIGRAM_INDEX[bg]) BIGRAM_INDEX[bg] = [];
+    if (!BIGRAM_INDEX[bg].includes(word)) BIGRAM_INDEX[bg].push(word);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════
+
+let targetWpm = 100;
+let wordsPerSet = 5;
+let setsPerSession = 10;
+let includeNumbers = false;
+let includeSymbols = false;
+
+document.getElementById('slWpm').addEventListener('input', function() {
+  targetWpm = parseInt(this.value);
+  document.getElementById('outWpm').textContent = this.value + ' wpm';
+});
+document.getElementById('slWords').addEventListener('input', function() {
+  wordsPerSet = parseInt(this.value);
+  document.getElementById('outWords').textContent = this.value;
+});
+document.getElementById('slSets').addEventListener('input', function() {
+  setsPerSession = parseInt(this.value);
+  document.getElementById('outSets').textContent = this.value;
+});
+
+function toggleInclude(type) {
+  if (type === 'numbers') {
+    includeNumbers = !includeNumbers;
+    document.getElementById('togNumbers').classList.toggle('active', includeNumbers);
+  } else if (type === 'symbols') {
+    includeSymbols = !includeSymbols;
+    document.getElementById('togSymbols').classList.toggle('active', includeSymbols);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// BIGRAM PROFILE — PERSISTENCE
+// ══════════════════════════════════════════════════
+
+// profile[bigram] = { errors: N, attempts: N, avgMs: N }
+let bigramProfile = {};
+
+function loadProfile() {
+  try {
+    const saved = localStorage.getItem('coldtype_profile');
+    if (saved) bigramProfile = JSON.parse(saved);
+  } catch(e) { bigramProfile = {}; }
+}
+
+function saveProfile() {
+  localStorage.setItem('coldtype_profile', JSON.stringify(bigramProfile));
+  localStorage.setItem('coldtype_sessions', (getSessionCount() + 1).toString());
+}
+
+function getSessionCount() { return parseInt(localStorage.getItem('coldtype_sessions') || '0'); }
+function getBestWpm()      { return parseInt(localStorage.getItem('coldtype_bestWpm') || '0'); }
+function saveBestWpm(v)    { localStorage.setItem('coldtype_bestWpm', Math.max(v, getBestWpm()).toString()); }
+
+function recordBigram(bg, isError, ms) {
+  if (!bigramProfile[bg]) bigramProfile[bg] = { errors: 0, attempts: 0, totalMs: 0 };
+  bigramProfile[bg].attempts++;
+  if (isError) bigramProfile[bg].errors++;
+  bigramProfile[bg].totalMs += ms;
+}
+
+function getWeakBigrams(topN = 10) {
+  const scored = Object.entries(bigramProfile)
+    .filter(([bg, d]) => d.attempts >= 3)
+    .map(([bg, d]) => ({
+      bg,
+      errorRate: d.errors / d.attempts,
+      avgMs: d.totalMs / d.attempts,
+    }))
+    .sort((a, b) => b.errorRate - a.errorRate || b.avgMs - a.avgMs);
+  return scored.slice(0, topN);
+}
+
+function exportProfile() {
+  const data = {
+    version: 1,
+    exported: new Date().toISOString(),
+    bestWpm: getBestWpm(),
+    sessions: getSessionCount(),
+    bigramProfile,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `coldtype-profile-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importProfile(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.bigramProfile) {
+        bigramProfile = data.bigramProfile;
+        if (data.bestWpm) saveBestWpm(data.bestWpm);
+        saveProfile();
+        refreshSetupStats();
+        renderWeaknessPreview();
+        alert('Profile imported successfully.');
+      }
+    } catch(err) { alert('Could not read profile file.'); }
+  };
+  reader.readAsText(file);
+}
+
+function refreshSetupStats() {
+  const bwpm = getBestWpm();
+  document.getElementById('statBestWpm').textContent = bwpm || '—';
+  const sessions = getSessionCount();
+  document.getElementById('statSessions').textContent = sessions || '—';
+  const weak = getWeakBigrams();
+  document.getElementById('statWeakCount').textContent = weak.length || '—';
+
+  // Avg accuracy from profile
+  const totalErrors = Object.values(bigramProfile).reduce((s,d) => s + d.errors, 0);
+  const totalAttempts = Object.values(bigramProfile).reduce((s,d) => s + d.attempts, 0);
+  if (totalAttempts > 0) {
+    document.getElementById('statAvgAcc').textContent =
+      Math.round((1 - totalErrors / totalAttempts) * 100) + '%';
+  } else {
+    document.getElementById('statAvgAcc').textContent = '—';
+  }
+}
+
+function renderWeaknessPreview() {
+  const weak = getWeakBigrams(12);
+  if (weak.length === 0) {
+    document.getElementById('weaknessPreview').style.display = 'none';
+    return;
+  }
+  document.getElementById('weaknessPreview').style.display = 'block';
+  document.getElementById('weaknessBars').innerHTML = weak.map(w =>
+    `<div class="bigram-bar">
+      <div class="bigram-label">${w.bg}</div>
+      <div class="bigram-score">${Math.round(w.errorRate * 100)}% err</div>
+    </div>`
+  ).join('');
+}
+
+// ══════════════════════════════════════════════════
+// WORD GENERATION
+// ══════════════════════════════════════════════════
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickWord() {
+  // Weight toward words containing known weak bigrams
+  const weak = getWeakBigrams(5).map(w => w.bg);
+  if (weak.length > 0 && Math.random() < 0.3) {
+    const bg = weak[Math.floor(Math.random() * weak.length)];
+    const candidates = BIGRAM_INDEX[bg];
+    if (candidates && candidates.length > 0) {
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+  }
+  return WORDS[Math.floor(Math.random() * WORDS.length)];
+}
+
+function generateSet(n) {
+  const words = [];
+  for (let i = 0; i < n; i++) {
+    let w = pickWord();
+    if (includeNumbers && Math.random() < 0.15) {
+      w = NUMBERS[Math.floor(Math.random() * NUMBERS.length)];
+    } else if (includeSymbols && Math.random() < 0.1) {
+      w = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    }
+    words.push(w);
+  }
+  return words;
+}
+
+// ══════════════════════════════════════════════════
+// BIGRAM EXTRACTION FROM ERROR
+// ══════════════════════════════════════════════════
+
+function extractErrorBigrams(target, typed) {
+  const bigrams = new Set();
+  // Find first error position
+  let errIdx = -1;
+  for (let i = 0; i < Math.min(target.length, typed.length); i++) {
+    if (target[i] !== typed[i]) { errIdx = i; break; }
+  }
+  if (errIdx === -1 && typed.length < target.length) errIdx = typed.length;
+  if (errIdx < 0) return bigrams;
+
+  // Extract bigrams around the error (before, at, after)
+  for (let offset = -1; offset <= 1; offset++) {
+    const i = errIdx + offset;
+    if (i >= 0 && i < target.length - 1) {
+      bigrams.add(target[i] + target[i+1]);
+    }
+  }
+  return bigrams;
+}
+
+// ══════════════════════════════════════════════════
+// PACE DRILL STATE
+// ══════════════════════════════════════════════════
+
+let paceState = {
+  currentSet: [],
+  currentWordIdx: 0,
+  setNumber: 0,
+  totalSets: 10,
+  missedWords: [],
+  errorBigrams: {},  // bigram -> error count this session
+  keyTimings: [],    // ms between keystrokes
+  lastKeyTime: 0,
+  wordsTyped: 0,
+  charsTyped: 0,
+  errors: 0,
+  sessionStart: null,
+  wordTimers: [],    // RAF handles for word timers
+  wordStartTime: 0,
+};
+
+function msPerWord() {
+  // At targetWpm, each word (avg 5 chars + space = 6 chars) takes:
+  // 60000ms / (targetWpm * 5) * 5 = 60000 / targetWpm ms per word
+  return (60000 / targetWpm);
+}
+
+// ══════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','pace','clinic','results'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showSetup() { show('setup'); refreshSetupStats(); renderWeaknessPreview(); }
+
+// ══════════════════════════════════════════════════
+// PACE DRILL
+// ══════════════════════════════════════════════════
+
+function startPaceDrill() {
+  paceState = {
+    currentSet: [],
+    currentWordIdx: 0,
+    setNumber: 0,
+    totalSets: setsPerSession,
+    missedWords: [],
+    errorBigrams: {},
+    keyTimings: [],
+    lastKeyTime: 0,
+    wordsTyped: 0,
+    charsTyped: 0,
+    errors: 0,
+    sessionStart: Date.now(),
+    wordTimers: [],
+    wordStartTime: 0,
+    peakWpm: 0,
+  };
+  show('pace');
+  document.getElementById('type-input').value = '';
+  document.getElementById('type-input').focus();
+  loadNextSet();
+}
+
+function loadNextSet() {
+  if (paceState.setNumber >= paceState.totalSets) {
+    endSession();
+    return;
+  }
+  paceState.currentSet = generateSet(wordsPerSet);
+  paceState.currentWordIdx = 0;
+  paceState.setNumber++;
+  renderWordStream();
+  startWordTimer(0);
+  updatePaceHud();
+  document.getElementById('type-input').value = '';
+  document.getElementById('type-input').focus();
+}
+
+function renderWordStream() {
+  const stream = document.getElementById('word-stream');
+  stream.innerHTML = '';
+  paceState.currentSet.forEach((word, i) => {
+    const row = document.createElement('div');
+    row.className = 'word-row';
+    row.id = `word-row-${i}`;
+
+    const timerBar = document.createElement('div');
+    timerBar.className = 'word-timer-bar';
+    timerBar.id = `word-timer-${i}`;
+    timerBar.style.width = '0px'; // hidden initially, shown for current
+
+    const wordEl = document.createElement('div');
+    wordEl.className = 'word-display ' + (i === 0 ? 'current' : 'upcoming');
+    wordEl.id = `word-el-${i}`;
+    wordEl.textContent = word;
+
+    row.appendChild(timerBar);
+    row.appendChild(wordEl);
+    stream.appendChild(row);
+  });
+}
+
+let wordTimerFrame = null;
+
+function startWordTimer(idx) {
+  if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+  paceState.wordStartTime = performance.now();
+  const duration = msPerWord();
+  const timerEl = document.getElementById(`word-timer-${idx}`);
+  const wordRow = document.getElementById(`word-row-${idx}`);
+
+  // Set timer bar width to word text width
+  const wordEl = document.getElementById(`word-el-${idx}`);
+  if (timerEl && wordEl) {
+    timerEl.style.width = wordEl.offsetWidth + 'px';
+  }
+
+  function tick() {
+    const elapsed = performance.now() - paceState.wordStartTime;
+    const pct = Math.min(1, elapsed / duration);
+    if (timerEl) {
+      const fullWidth = wordEl ? wordEl.offsetWidth : 80;
+      timerEl.style.width = Math.max(0, fullWidth * (1 - pct)) + 'px';
+      timerEl.style.background = pct < 0.5 ? 'var(--accent)' : pct < 0.8 ? 'var(--warn)' : 'var(--danger)';
+    }
+
+    if (pct < 1) {
+      wordTimerFrame = requestAnimationFrame(tick);
+    } else {
+      // Time's up for this word — mark as missed
+      wordMissed(idx);
+    }
+  }
+  wordTimerFrame = requestAnimationFrame(tick);
+}
+
+function wordMissed(idx) {
+  if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+  const word = paceState.currentSet[idx];
+  const wordEl = document.getElementById(`word-el-${idx}`);
+  if (wordEl) wordEl.className = 'word-display missed';
+
+  // Record all bigrams in missed word as errors
+  for (let i = 0; i < word.length - 1; i++) {
+    const bg = word[i] + word[i+1];
+    recordBigram(bg, true, msPerWord());
+    paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 1;
+  }
+
+  paceState.missedWords.push(word);
+  paceState.errors++;
+  paceState.currentWordIdx = idx + 1;
+
+  if (paceState.currentWordIdx >= paceState.currentSet.length) {
+    setTimeout(loadNextSet, 400);
+  } else {
+    const nextEl = document.getElementById(`word-el-${paceState.currentWordIdx}`);
+    if (nextEl) nextEl.className = 'word-display current';
+    document.getElementById('type-input').value = '';
+    startWordTimer(paceState.currentWordIdx);
+  }
+  updatePaceHud();
+}
+
+function updatePaceHud() {
+  const elapsed = (Date.now() - paceState.sessionStart) / 60000;
+  const wpm = elapsed > 0 ? Math.round(paceState.wordsTyped / elapsed) : 0;
+  if (wpm > paceState.peakWpm) paceState.peakWpm = wpm;
+
+  const total = paceState.wordsTyped + paceState.errors;
+  const acc = total > 0 ? Math.round((paceState.wordsTyped / total) * 100) : 100;
+
+  document.getElementById('hudWpm').textContent = wpm;
+  document.getElementById('hudAcc').textContent = acc + '%';
+  document.getElementById('hudSet').textContent = `${paceState.setNumber}/${paceState.totalSets}`;
+  document.getElementById('hudMissed').textContent = paceState.errors;
+
+  const pct = (paceState.setNumber - 1) / paceState.totalSets * 100 +
+    (paceState.currentWordIdx / wordsPerSet) * (100 / paceState.totalSets);
+  document.getElementById('pace-progress').style.width = pct + '%';
+
+  // Rhythm score
+  if (paceState.keyTimings.length >= 4) {
+    const timings = paceState.keyTimings.slice(-20);
+    const avg = timings.reduce((a,b) => a+b, 0) / timings.length;
+    const variance = timings.reduce((s,t) => s + Math.pow(t - avg, 2), 0) / timings.length;
+    const cv = Math.sqrt(variance) / avg; // coefficient of variation
+    const rhythmScore = Math.max(0, Math.round((1 - cv) * 100));
+    document.getElementById('hudRhythm').textContent = rhythmScore + '%';
+    const bar = document.getElementById('rhythm-bar');
+    bar.style.width = rhythmScore + '%';
+    bar.style.background = rhythmScore > 80 ? 'var(--green)' : rhythmScore > 60 ? 'var(--warn)' : 'var(--danger)';
+  }
+
+  document.getElementById('pace-info').textContent =
+    `target: ${targetWpm} wpm · ${Math.round(msPerWord())}ms per word`;
+}
+
+// Handle typing input
+document.getElementById('type-input').addEventListener('keydown', e => {
+  if (e.key === 'Tab') { e.preventDefault(); return; }
+
+  // Track keystroke timing for rhythm
+  const now = performance.now();
+  if (paceState.lastKeyTime > 0) {
+    const delta = now - paceState.lastKeyTime;
+    if (delta < 2000) paceState.keyTimings.push(delta);
+  }
+  paceState.lastKeyTime = now;
+});
+
+document.getElementById('type-input').addEventListener('input', function() {
+  const val = this.value;
+  const idx = paceState.currentWordIdx;
+  if (idx >= paceState.currentSet.length) return;
+
+  const target = paceState.currentSet[idx];
+
+  // Check if word is complete (space or exact match at end)
+  if (val.endsWith(' ') || val === target) {
+    const typed = val.trim();
+    handleWordSubmit(idx, typed, target);
+    return;
+  }
+
+  // Live error highlighting
+  const isCorrectSoFar = target.startsWith(val);
+  this.classList.toggle('error', !isCorrectSoFar && val.length > 0);
+  this.classList.remove('success');
+});
+
+function handleWordSubmit(idx, typed, target) {
+  if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+
+  const responseMs = performance.now() - paceState.wordStartTime;
+  const isCorrect = typed === target;
+
+  const wordEl = document.getElementById(`word-el-${idx}`);
+  if (wordEl) wordEl.className = 'word-display ' + (isCorrect ? 'correct' : 'missed');
+
+  // Extract and record bigrams
+  for (let i = 0; i < target.length - 1; i++) {
+    const bg = target[i] + target[i+1];
+    const bgMs = responseMs / Math.max(1, target.length);
+    recordBigram(bg, !isCorrect, bgMs);
+    if (!isCorrect) {
+      paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 1;
+    }
+  }
+
+  // If error, also extract specific error bigrams
+  if (!isCorrect) {
+    const errBigrams = extractErrorBigrams(target, typed);
+    errBigrams.forEach(bg => {
+      paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 2; // weight error bigrams higher
+    });
+    paceState.missedWords.push(target);
+    paceState.errors++;
+  } else {
+    paceState.wordsTyped++;
+    paceState.charsTyped += target.length;
+  }
+
+  paceState.currentWordIdx = idx + 1;
+  document.getElementById('type-input').value = '';
+  document.getElementById('type-input').classList.remove('error', 'success');
+
+  updatePaceHud();
+
+  if (paceState.currentWordIdx >= paceState.currentSet.length) {
+    setTimeout(loadNextSet, 300);
+  } else {
+    const nextEl = document.getElementById(`word-el-${paceState.currentWordIdx}`);
+    if (nextEl) nextEl.className = 'word-display current';
+    startWordTimer(paceState.currentWordIdx);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// SESSION END
+// ══════════════════════════════════════════════════
+
+function endSession() {
+  if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+  saveProfile();
+  saveBestWpm(paceState.peakWpm);
+
+  const total = paceState.wordsTyped + paceState.errors;
+  const acc = total > 0 ? Math.round((paceState.wordsTyped / total) * 100) : 100;
+
+  // Rhythm score
+  let rhythmScore = '—';
+  if (paceState.keyTimings.length >= 10) {
+    const timings = paceState.keyTimings;
+    const avg = timings.reduce((a,b) => a+b, 0) / timings.length;
+    const variance = timings.reduce((s,t) => s + Math.pow(t-avg,2), 0) / timings.length;
+    const cv = Math.sqrt(variance) / avg;
+    rhythmScore = Math.max(0, Math.round((1-cv)*100)) + '%';
+  }
+
+  document.getElementById('resWpm').textContent = paceState.peakWpm;
+  document.getElementById('resAcc').textContent = acc + '%';
+  document.getElementById('resRhythm').textContent = rhythmScore;
+  document.getElementById('resMissed').textContent = paceState.errors;
+
+  // Top weak bigrams from this session
+  const sessionWeak = Object.entries(paceState.errorBigrams)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 12);
+
+  const weakList = document.getElementById('weaknessList');
+  weakList.innerHTML = sessionWeak.length > 0
+    ? sessionWeak.map(([bg, count]) =>
+        `<div class="weak-chip ${count <= 1 ? 'mild' : ''}">${bg} ×${count}</div>`
+      ).join('')
+    : '<div style="font-size:0.7rem;color:var(--green)">no significant errors — excellent!</div>';
+
+  // Show clinic button only if there are bigrams to drill
+  document.getElementById('clinicBtn').style.display = sessionWeak.length > 0 ? 'block' : 'none';
+
+  show('results');
+}
+
+// ══════════════════════════════════════════════════
+// BIGRAM CLINIC
+// ══════════════════════════════════════════════════
+
+let clinicState = {
+  bigrams: [],      // ordered list of bigrams to drill
+  currentBgIdx: 0,
+  words: [],        // words for current bigram
+  currentWordIdx: 0,
+  errors: 0,
+  done: 0,
+  clinicStart: 0,
+  keyTimings: [],
+  lastKeyTime: 0,
+};
+
+function startClinic() {
+  // Get top weak bigrams from session + profile
+  const sessionWeak = Object.entries(paceState.errorBigrams)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([bg]) => bg);
+
+  const profileWeak = getWeakBigrams(5).map(w => w.bg);
+
+  // Merge and deduplicate, session errors first
+  const allWeak = [...new Set([...sessionWeak, ...profileWeak])].slice(0, 6);
+
+  if (allWeak.length === 0) {
+    alert('No weak bigrams to drill. Keep training!');
+    return;
+  }
+
+  clinicState = {
+    bigrams: allWeak,
+    currentBgIdx: 0,
+    words: [],
+    currentWordIdx: 0,
+    errors: 0,
+    done: 0,
+    clinicStart: Date.now(),
+    keyTimings: [],
+    lastKeyTime: 0,
+  };
+
+  show('clinic');
+  document.getElementById('clinic-input').value = '';
+  loadClinicBigram();
+}
+
+function generateSyntheticWords(bg) {
+  // Create drill words: bgbgbg, bgbg, gbgbg (reversed)
+  const rev = bg[1] + bg[0];
+  return [
+    bg + bg + bg,
+    bg + bg,
+    rev + rev + rev,
+    bg + rev + bg,
+    rev + bg + rev,
+  ];
+}
+
+function loadClinicBigram() {
+  if (clinicState.currentBgIdx >= clinicState.bigrams.length) {
+    endClinic();
+    return;
+  }
+
+  const bg = clinicState.bigrams[clinicState.currentBgIdx];
+  document.getElementById('clinic-bigram-display').textContent = bg.toUpperCase();
+  document.getElementById('cHudBigram').textContent = bg;
+
+  // Real words containing this bigram
+  const realWords = (BIGRAM_INDEX[bg] || []).slice(0, 10);
+  // Synthetic drill words
+  const synthWords = generateSyntheticWords(bg);
+
+  // Mix: real words first, then synthetic fillers if needed
+  const allWords = [...realWords, ...synthWords].slice(0, 20);
+  clinicState.words = allWords;
+  clinicState.currentWordIdx = 0;
+  clinicState.clinicStart = Date.now();
+
+  renderClinicWords();
+  document.getElementById('clinic-input').value = '';
+  document.getElementById('clinic-input').focus();
+  updateClinicHud();
+}
+
+function renderClinicWords() {
+  const container = document.getElementById('clinic-words');
+  container.innerHTML = clinicState.words.map((w, i) => {
+    let cls = 'clinic-word';
+    if (i === clinicState.currentWordIdx) cls += ' current';
+    else if (i < clinicState.currentWordIdx) cls += ' done';
+    return `<div class="${cls}" id="cw-${i}">${w}</div>`;
+  }).join('');
+}
+
+function updateClinicHud() {
+  const done = clinicState.currentWordIdx;
+  const total = clinicState.words.length;
+  const elapsed = (Date.now() - clinicState.clinicStart) / 60000;
+  const wpm = elapsed > 0 ? Math.round(done / elapsed) : 0;
+  const acc = done > 0 ? Math.round(((done - clinicState.errors) / done) * 100) : 100;
+
+  document.getElementById('cHudDone').textContent = done;
+  document.getElementById('cHudTotal').textContent = total;
+  document.getElementById('cHudWpm').textContent = wpm || '—';
+  document.getElementById('cHudAcc').textContent = done > 0 ? acc + '%' : '—';
+  document.getElementById('clinic-progress').textContent =
+    `bigram ${clinicState.currentBgIdx + 1} of ${clinicState.bigrams.length} · ${done}/${total} words`;
+}
+
+document.getElementById('clinic-input').addEventListener('keydown', e => {
+  const now = performance.now();
+  if (clinicState.lastKeyTime > 0) {
+    const delta = now - clinicState.lastKeyTime;
+    if (delta < 2000) clinicState.keyTimings.push(delta);
+  }
+  clinicState.lastKeyTime = now;
+});
+
+document.getElementById('clinic-input').addEventListener('input', function() {
+  const val = this.value;
+  const idx = clinicState.currentWordIdx;
+  if (idx >= clinicState.words.length) return;
+
+  const target = clinicState.words[idx];
+
+  if (val.endsWith(' ') || val === target) {
+    const typed = val.trim();
+    const isCorrect = typed === target;
+    const bg = clinicState.bigrams[clinicState.currentBgIdx];
+    const elapsed = Date.now() - clinicState.clinicStart;
+    const msPerChar = elapsed / Math.max(1, clinicState.currentWordIdx * 5 + typed.length);
+
+    recordBigram(bg, !isCorrect, msPerChar * target.length);
+
+    const wordEl = document.getElementById(`cw-${idx}`);
+    if (wordEl) wordEl.className = 'clinic-word ' + (isCorrect ? 'done' : 'missed');
+
+    if (!isCorrect) clinicState.errors++;
+    clinicState.currentWordIdx++;
+    this.value = '';
+    this.classList.remove('error');
+
+    updateClinicHud();
+
+    if (clinicState.currentWordIdx >= clinicState.words.length) {
+      clinicState.currentBgIdx++;
+      setTimeout(loadClinicBigram, 500);
+    } else {
+      const nextEl = document.getElementById(`cw-${clinicState.currentWordIdx}`);
+      if (nextEl) nextEl.className = 'clinic-word current';
+    }
+    return;
+  }
+
+  const isCorrectSoFar = target.startsWith(val);
+  this.classList.toggle('error', !isCorrectSoFar && val.length > 0);
+});
+
+function endClinic() {
+  saveProfile();
+  // Return to results
+  show('results');
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('startPaceBtn').addEventListener('click', startPaceDrill);
+
+// ══════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════
+
+loadProfile();
+refreshSetupStats();
+renderWeaknessPreview();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
