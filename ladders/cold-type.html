@@ -911,7 +911,6 @@ document.getElementById('type-input').addEventListener('input', function() {
 
 function handleWordSubmit(idx, typedClean, targetClean, targetOriginal) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
-  
 
   const isCorrect = typedClean === targetClean;
   console.log(`[ColdType] target: "${targetOriginal}" | typed: "${typedClean}" | correct: ${isCorrect}`);
@@ -921,9 +920,9 @@ function handleWordSubmit(idx, typedClean, targetClean, targetOriginal) {
   const wordEl = document.getElementById(`word-el-${idx}`);
   if (wordEl) wordEl.className = 'word-display ' + (isCorrect ? 'correct' : 'missed');
 
-  for (let i = 0; i < target.length - 1; i++) {
-    const bg = target[i] + target[i+1];
-    const bgMs = responseMs / Math.max(1, target.length);
+  for (let i = 0; i < targetOriginal.length - 1; i++) {
+    const bg = targetOriginal[i] + targetOriginal[i+1];
+    const bgMs = responseMs / Math.max(1, targetOriginal.length);
     recordBigram(bg, !isCorrect, bgMs);
     if (!isCorrect) {
       paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 1;
@@ -1225,6 +1224,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.1</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.2</div>
 </body>
 </html>
