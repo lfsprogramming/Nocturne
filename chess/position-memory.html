@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Position Memory — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --accent: #00f5ff;
+  --accent2: #ff006e;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --warn: #ff9500;
+  --danger: #ff003c;
+  --ivory: #e8d5a3;
+  --text: #e8e8f0;
+  --muted: #404060;
+  --sq-light: #c9b07a;
+  --sq-dark: #6b4f2a;
+  --sq-highlight: rgba(0,245,255,0.45);
+  --sq-correct: rgba(0,255,136,0.35);
+  --sq-wrong: rgba(255,0,60,0.45);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none; z-index: 1000;
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+.screen.active { display: flex; }
+
+/* ── SETUP ── */
+#setup {
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1f 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 8vw, 4rem);
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--ivory), var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(255,215,0,0.3));
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(255,215,0,0.2)); }
+  50%      { filter: drop-shadow(0 0 40px rgba(255,215,0,0.5)); }
+}
+
+.tagline { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -12px; }
+
+.best-row { display: flex; gap: 28px; justify-content: center; }
+.best-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.best-item .bval { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+.best-item .blbl { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.section-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw); }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 150px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--gold); }
+.setting-val { font-size: 0.75rem; color: var(--gold); min-width: 44px; text-align: right; }
+
+.start-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.2em;
+  padding: 11px 44px; border: 2px solid var(--gold); background: transparent;
+  color: var(--gold); cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--gold); transform: translateX(-100%); transition: transform 0.2s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+
+/* ── DRILL ── */
+#drill { gap: 0; justify-content: flex-start; background: var(--bg); min-height: 100vh; }
+
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.gold { color: var(--gold); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl { font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+
+#timer-bar-bg { width: 100%; height: 3px; background: var(--border); flex-shrink: 0; }
+#timer-bar { height: 100%; width: 100%; background: var(--gold); transition: background 0.1s; }
+#progress-bar-bg { width: 100%; height: 2px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--gold); transition: width 0.3s ease; }
+
+#drill-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; padding: 10px;
+}
+
+#level-badge { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; }
+#phase-label { font-size: 0.7rem; color: var(--gold); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; min-height: 18px; }
+
+/* ── BOARD ── */
+.board-outer { display: flex; flex-direction: row; align-items: flex-start; gap: 4px; }
+.rank-labels { display: flex; flex-direction: column; }
+.rank-label { font-size: 0.5rem; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.file-labels { display: flex; flex-direction: row; padding-left: 0; }
+.file-label { font-size: 0.5rem; color: var(--muted); text-align: center; }
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  border: 2px solid #2a2a1a;
+  box-shadow: 0 0 30px rgba(255,215,0,0.06);
+  cursor: pointer;
+}
+
+.sq {
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  transition: background 0.1s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.sq.light { background: var(--sq-light); }
+.sq.dark  { background: var(--sq-dark); }
+.sq.highlighted { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 2; }
+.sq.correct-sq  { background: rgba(0,255,136,0.4) !important; }
+.sq.wrong-sq    { background: rgba(255,0,60,0.4) !important; }
+
+.piece {
+  font-size: inherit;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+  transition: opacity 0.3s;
+}
+.piece.fade-out { opacity: 0; }
+
+/* ── COLOR INDICATOR ── */
+#color-indicator {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 2px; background: var(--surface);
+}
+.ci-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.ci-piece { font-size: 1.4rem; line-height: 1; }
+.ci-name { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.1em; }
+#ci-arrows { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.05em; }
+
+/* ── CONTROLS HINT ── */
+.controls-hint {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center;
+  max-width: 380px;
+}
+.hint-item { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.06em; }
+.hint-item span { color: var(--text); }
+
+/* ── STATUS ── */
+#status-area { text-align: center; min-height: 36px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#status-msg { font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.s-ok  { color: var(--green); }
+.s-err { color: var(--danger); }
+.s-info { color: var(--gold); }
+
+#progress-info { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; }
+
+/* ── SUBMIT BTN ── */
+#submit-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.2em;
+  padding: 10px 36px; border: 1px solid var(--green); background: transparent;
+  color: var(--green); cursor: pointer; border-radius: 2px; transition: all 0.15s;
+  display: none;
+}
+#submit-btn.visible { display: block; }
+#submit-btn:hover { background: var(--green); color: #000; }
+
+/* ── GAME OVER ── */
+#gameover { gap: 16px; text-align: center; background: var(--bg); }
+.go-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 12vw, 7rem); line-height: 1;
+  color: var(--danger); filter: drop-shadow(0 0 40px rgba(255,0,60,0.6));
+  animation: goshake 0.5s ease-out;
+}
+@keyframes goshake { 0%{transform:translateX(-8px)} 20%{transform:translateX(8px)} 40%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
+.go-stat { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; }
+.go-stat span { color: var(--accent); }
+.go-stat.gold span { color: var(--gold); }
+.go-new-best { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 0.2em; animation: newbest 0.5s ease-out 0.3s both; }
+@keyframes newbest { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.go-press { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1s step-end infinite; margin-top: 4px; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.go-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.go-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
+.go-btn:hover { background: var(--border); }
+.go-btn.primary { border-color: var(--accent2); color: var(--accent2); background: transparent; }
+.go-btn.primary:hover { background: var(--accent2); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup" class="screen active">
+  <div class="logo">♟ Position Memory</div>
+  <div class="tagline">observe · recall · reconstruct</div>
+
+  <div class="best-row">
+    <div class="best-item"><div class="bval" id="bestLevel">—</div><div class="blbl">Best Level</div></div>
+    <div class="best-item"><div class="bval" id="bestStreak">—</div><div class="blbl">Best Streak</div></div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+    <div class="setting-row">
+      <label>display duration</label>
+      <input type="range" id="slDisplay" min="0.5" max="10" step="0.5" value="2">
+      <span class="setting-val" id="outDisplay">2.0s</span>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">start</button>
+
+  <div style="font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-align:center;max-width:340px;line-height:1.9;">
+    levels 1–5 · 2–6 pieces · 20 questions each<br>
+    level 6+ · 6 pieces · display time −5% per level<br>
+    click square · p/r/n/b/q/k to place · ↑↓ color · esc clear · enter submit
+  </div>
+</div>
+
+<!-- ══ DRILL ══ -->
+<div id="drill" class="screen">
+  <div id="hud">
+    <div class="hud-stat"><div class="val gold" id="hudLevel">1</div><div class="lbl">Level</div></div>
+    <div class="hud-stat"><div class="val green" id="hudDone">0</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudNeeded">20</div><div class="lbl">Needed</div></div>
+    <div class="hud-stat"><div class="val" id="hudStreak">0</div><div class="lbl">Streak</div></div>
+    <div class="hud-stat"><div class="val" id="hudTime">2.0s</div><div class="lbl">Display</div></div>
+  </div>
+  <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+
+  <div id="drill-body">
+    <div id="level-badge"></div>
+    <div id="phase-label"></div>
+
+    <div class="board-outer">
+      <div class="rank-labels" id="rankLabels"></div>
+      <div>
+        <div id="board"></div>
+        <div class="file-labels" id="fileLabels"></div>
+      </div>
+    </div>
+
+    <div id="color-indicator">
+      <div class="ci-label">placing</div>
+      <div class="ci-piece" id="ciPiece">♙</div>
+      <div class="ci-name" id="ciName">white</div>
+      <div id="ci-arrows">↑↓ to toggle</div>
+    </div>
+
+    <button id="submit-btn" onclick="submitReconstruction()">submit ↵</button>
+
+    <div id="status-area">
+      <div id="status-msg"></div>
+    </div>
+
+    <div class="controls-hint">
+      <div class="hint-item"><span>p</span> pawn</div>
+      <div class="hint-item"><span>r</span> rook</div>
+      <div class="hint-item"><span>n</span> knight</div>
+      <div class="hint-item"><span>b</span> bishop</div>
+      <div class="hint-item"><span>q</span> queen</div>
+      <div class="hint-item"><span>k</span> king</div>
+      <div class="hint-item"><span>↑↓</span> color</div>
+      <div class="hint-item"><span>esc</span> clear</div>
+      <div class="hint-item"><span>enter</span> submit</div>
+    </div>
+
+    <div id="progress-info"></div>
+  </div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="gameover" class="screen">
+  <div class="go-title">wrong</div>
+  <div class="go-stat">reached level <span id="goLevel">1</span></div>
+  <div class="go-stat gold">best level: <span id="goBest">—</span></div>
+  <div class="go-new-best" id="goNewBest" style="display:none">★ new record ★</div>
+  <div class="go-stat" id="goSession" style="font-size:0.65rem;color:var(--muted)"></div>
+  <div class="go-press">press space or tap to try again</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// PIECE DATA — FEN-native
+// ══════════════════════════════════════════════════
+
+// FEN piece codes: uppercase = white, lowercase = black
+// P=pawn, R=rook, N=knight, B=bishop, Q=queen, K=king
+
+const PIECE_UNICODE = {
+  // white
+  'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
+  // black
+  'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
+};
+
+const KEY_TO_PIECE = { p:'P', r:'R', n:'N', b:'B', q:'Q', k:'K' };
+
+// Realistic piece distribution weights (relative frequency in real games)
+const PIECE_WEIGHTS = [
+  { type: 'P', weight: 35 },
+  { type: 'R', weight: 15 },
+  { type: 'N', weight: 15 },
+  { type: 'B', weight: 15 },
+  { type: 'Q', weight: 10 },
+  { type: 'K', weight: 10 },
+];
+
+function weightedPiece() {
+  const total = PIECE_WEIGHTS.reduce((s, p) => s + p.weight, 0);
+  let r = Math.random() * total;
+  for (const p of PIECE_WEIGHTS) { r -= p.weight; if (r <= 0) return p.type; }
+  return 'P';
+}
+
+// ══════════════════════════════════════════════════
+// FEN UTILITIES
+// ══════════════════════════════════════════════════
+
+// Board = array of 64 squares, index 0 = a8 (top-left), 63 = h1 (bottom-right)
+// FEN rank order: rank 8 first
+
+function emptyBoard() { return new Array(64).fill(null); }
+
+function boardToFen(board) {
+  let fen = '';
+  for (let rank = 0; rank < 8; rank++) {
+    let empty = 0;
+    for (let file = 0; file < 8; file++) {
+      const piece = board[rank * 8 + file];
+      if (piece) {
+        if (empty > 0) { fen += empty; empty = 0; }
+        fen += piece;
+      } else {
+        empty++;
+      }
+    }
+    if (empty > 0) fen += empty;
+    if (rank < 7) fen += '/';
+  }
+  return fen; // just the piece placement part
+}
+
+function fenToBoard(fen) {
+  const board = emptyBoard();
+  const ranks = fen.split('/');
+  for (let rank = 0; rank < 8; rank++) {
+    let file = 0;
+    for (const ch of ranks[rank]) {
+      if ('12345678'.includes(ch)) {
+        file += parseInt(ch);
+      } else {
+        board[rank * 8 + file] = ch;
+        file++;
+      }
+    }
+  }
+  return board;
+}
+
+// ══════════════════════════════════════════════════
+// POSITION GENERATOR
+// ══════════════════════════════════════════════════
+
+function generatePosition(numPieces) {
+  const board = emptyBoard();
+  const usedSquares = new Set();
+
+  // Decide dominant color (white or black has more pieces)
+  // With numPieces pieces, roughly 60% one color, 40% other
+  const whiteCount = Math.ceil(numPieces * (0.5 + (Math.random() * 0.2)));
+  const blackCount = numPieces - whiteCount;
+
+  let placed = 0;
+  let attempts = 0;
+
+  function placeGroup(count, isWhite) {
+    let groupPlaced = 0;
+    while (groupPlaced < count && attempts < 500) {
+      attempts++;
+      const sq = Math.floor(Math.random() * 64);
+      if (usedSquares.has(sq)) continue;
+      const rank = Math.floor(sq / 8); // 0=rank8, 7=rank1
+      let type = weightedPiece();
+      // No pawns on rank 1 (index 56-63) or rank 8 (index 0-7)
+      if (type === 'P' && (rank === 0 || rank === 7)) continue;
+      const piece = isWhite ? type : type.toLowerCase();
+      board[sq] = piece;
+      usedSquares.add(sq);
+      groupPlaced++;
+    }
+  }
+
+  placeGroup(whiteCount, true);
+  placeGroup(blackCount, false);
+
+  return boardToFen(board);
+}
+
+// ══════════════════════════════════════════════════
+// SETTINGS STATE
+// ══════════════════════════════════════════════════
+
+let baseDisplayTime = 2.0;
+
+document.getElementById('slDisplay').addEventListener('input', function() {
+  baseDisplayTime = parseFloat(this.value);
+  document.getElementById('outDisplay').textContent = baseDisplayTime.toFixed(1) + 's';
+});
+
+// ══════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════
+
+let currentLevel = 0;      // 0-indexed
+let levelDone = 0;
+let streak = 0;
+let sessionLog = [];
+let sessionStart = null;
+let phase = 'idle';        // 'show' | 'recall' | 'feedback' | 'idle'
+
+let targetFen = '';        // correct position FEN
+let playerBoard = emptyBoard(); // player's reconstruction
+let selectedSq = null;     // currently highlighted square index
+let placingWhite = true;   // current color for placing pieces
+
+let timerAnimFrame = null;
+let displayStart = 0;
+
+// ══════════════════════════════════════════════════
+// LEVEL CONFIG
+// ══════════════════════════════════════════════════
+
+const NEEDED_PER_LEVEL = 20;
+
+function getLevelConfig(levelIndex) {
+  if (levelIndex < 5) {
+    return {
+      pieces: levelIndex + 2,        // 2,3,4,5,6
+      displayTime: baseDisplayTime,
+      desc: `${levelIndex + 2} pieces · ${baseDisplayTime.toFixed(1)}s display`,
+    };
+  }
+  // Level 6+: 6 pieces, shrinking display time
+  const timedIndex = levelIndex - 5;
+  const displayTime = baseDisplayTime * Math.pow(0.95, timedIndex);
+  return {
+    pieces: 6,
+    displayTime,
+    desc: `6 pieces · ${displayTime.toFixed(2)}s display`,
+  };
+}
+
+// ══════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════
+
+function getBestLevel()  { return parseInt(localStorage.getItem('posMem_bestLevel')  || '0'); }
+function getBestStreak() { return parseInt(localStorage.getItem('posMem_bestStreak') || '0'); }
+function saveBestLevel(v)  { localStorage.setItem('posMem_bestLevel',  v); refreshBest(); }
+function saveBestStreak(v) { localStorage.setItem('posMem_bestStreak', v); refreshBest(); }
+function refreshBest() {
+  const bl = getBestLevel(), bs = getBestStreak();
+  document.getElementById('bestLevel').textContent  = bl > 0 ? bl : '—';
+  document.getElementById('bestStreak').textContent = bs > 0 ? bs : '—';
+}
+
+// ══════════════════════════════════════════════════
+// BOARD RENDERING
+// ══════════════════════════════════════════════════
+
+function buildBoard() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+
+  const sqSize = Math.min(52, Math.max(32, Math.floor((Math.min(window.innerWidth, window.innerHeight) - 160) / 9)));
+  boardEl.style.gridTemplateColumns = `repeat(8, ${sqSize}px)`;
+
+  for (let rank = 0; rank < 8; rank++) {
+    for (let file = 0; file < 8; file++) {
+      const sq = document.createElement('div');
+      const idx = rank * 8 + file;
+      sq.className = 'sq ' + ((rank + file) % 2 === 0 ? 'light' : 'dark');
+      sq.id = `sq-${idx}`;
+      sq.style.width = sqSize + 'px';
+      sq.style.height = sqSize + 'px';
+      sq.style.fontSize = Math.floor(sqSize * 0.72) + 'px';
+      sq.addEventListener('click', () => handleSquareClick(idx));
+      boardEl.appendChild(sq);
+    }
+  }
+
+  // Rank labels
+  const rankEl = document.getElementById('rankLabels');
+  rankEl.innerHTML = '';
+  for (let rank = 0; rank < 8; rank++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'rank-label';
+    lbl.style.height = sqSize + 'px';
+    lbl.style.width = '14px';
+    lbl.textContent = 8 - rank;
+    rankEl.appendChild(lbl);
+  }
+
+  // File labels
+  const fileEl = document.getElementById('fileLabels');
+  fileEl.innerHTML = '';
+  for (let file = 0; file < 8; file++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'file-label';
+    lbl.style.width = sqSize + 'px';
+    lbl.textContent = 'abcdefgh'[file];
+    fileEl.appendChild(lbl);
+  }
+}
+
+function renderBoard(board, showPieces = true, fadeOut = false) {
+  for (let i = 0; i < 64; i++) {
+    const sq = document.getElementById(`sq-${i}`);
+    if (!sq) continue;
+    sq.innerHTML = '';
+    sq.classList.remove('highlighted', 'correct-sq', 'wrong-sq');
+    if (i === selectedSq) sq.classList.add('highlighted');
+
+    if (showPieces && board[i]) {
+      const pieceEl = document.createElement('div');
+      pieceEl.className = 'piece' + (fadeOut ? ' fade-out' : '');
+      pieceEl.textContent = PIECE_UNICODE[board[i]] || '';
+      sq.appendChild(pieceEl);
+    }
+  }
+}
+
+function renderPlayerBoard() {
+  renderBoard(playerBoard, true, false);
+  // Re-apply highlight
+  if (selectedSq !== null) {
+    const sq = document.getElementById(`sq-${selectedSq}`);
+    if (sq) sq.classList.add('highlighted');
+  }
+}
+
+function showResultOverlay(targetBoard, playerBrd) {
+  for (let i = 0; i < 64; i++) {
+    const sq = document.getElementById(`sq-${i}`);
+    if (!sq) continue;
+    const target = targetBoard[i];
+    const player = playerBrd[i];
+    if (target || player) {
+      if (target === player) {
+        sq.classList.add('correct-sq');
+      } else {
+        sq.classList.add('wrong-sq');
+        // Show correct piece
+        if (target) {
+          const pieceEl = document.createElement('div');
+          pieceEl.className = 'piece';
+          pieceEl.textContent = PIECE_UNICODE[target] || '';
+          pieceEl.style.opacity = '0.6';
+          sq.appendChild(pieceEl);
+        }
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// COLOR INDICATOR
+// ══════════════════════════════════════════════════
+
+function updateColorIndicator() {
+  const piece = placingWhite ? '♙' : '♟';
+  const name = placingWhite ? 'white' : 'black';
+  document.getElementById('ciPiece').textContent = piece;
+  document.getElementById('ciName').textContent = name;
+  document.getElementById('ciName').style.color = placingWhite ? '#e8e8f0' : '#a0a0c0';
+}
+
+// ══════════════════════════════════════════════════
+// SQUARE INTERACTION
+// ══════════════════════════════════════════════════
+
+function handleSquareClick(idx) {
+  if (phase !== 'recall') return;
+  selectedSq = (selectedSq === idx) ? null : idx;
+  renderPlayerBoard();
+}
+
+function placePiece(type) {
+  // type = 'P','R','N','B','Q','K'
+  if (phase !== 'recall' || selectedSq === null) return;
+  const piece = placingWhite ? type : type.toLowerCase();
+  playerBoard[selectedSq] = piece;
+  renderPlayerBoard();
+}
+
+function clearSelectedSquare() {
+  if (phase !== 'recall' || selectedSq === null) return;
+  playerBoard[selectedSq] = null;
+  renderPlayerBoard();
+}
+
+// ══════════════════════════════════════════════════
+// TIMER
+// ══════════════════════════════════════════════════
+
+function clearTimers() {
+  if (timerAnimFrame) cancelAnimationFrame(timerAnimFrame);
+}
+
+function runDisplayTimer(duration, onDone) {
+  clearTimers();
+  displayStart = performance.now();
+  function tick() {
+    const elapsed = (performance.now() - displayStart) / 1000;
+    const left = Math.max(0, duration - elapsed);
+    const pct = left / duration;
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = (pct * 100) + '%';
+    bar.style.background = pct > 0.5 ? 'var(--gold)' : pct > 0.25 ? 'var(--warn)' : 'var(--danger)';
+    document.getElementById('hudTime').textContent = left.toFixed(1) + 's';
+    if (left > 0) timerAnimFrame = requestAnimationFrame(tick);
+    else onDone();
+  }
+  timerAnimFrame = requestAnimationFrame(tick);
+}
+
+// ══════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════
+
+function show(id) {
+  ['setup','drill','gameover'].forEach(s => document.getElementById(s).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function updateHud() {
+  const cfg = getLevelConfig(currentLevel);
+  document.getElementById('hudLevel').textContent  = currentLevel + 1;
+  document.getElementById('hudDone').textContent   = levelDone;
+  document.getElementById('hudNeeded').textContent = NEEDED_PER_LEVEL;
+  document.getElementById('hudStreak').textContent = streak;
+  document.getElementById('hudTime').textContent   = cfg.displayTime.toFixed(1) + 's';
+  document.getElementById('level-badge').textContent = `level ${currentLevel + 1} · ${cfg.desc}`;
+  const pct = Math.min(100, Math.round(levelDone / NEEDED_PER_LEVEL * 100));
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-info').textContent =
+    `${levelDone} / ${NEEDED_PER_LEVEL} · level ${currentLevel + 1}`;
+}
+
+// ══════════════════════════════════════════════════
+// GAME FLOW
+// ══════════════════════════════════════════════════
+
+function startSession() {
+  currentLevel = 0;
+  levelDone = 0;
+  streak = 0;
+  sessionLog = [];
+  sessionStart = new Date();
+  buildBoard();
+  show('drill');
+  updateColorIndicator();
+  nextPosition();
+}
+
+function nextPosition() {
+  phase = 'show';
+  clearTimers();
+  selectedSq = null;
+  playerBoard = emptyBoard();
+
+  const cfg = getLevelConfig(currentLevel);
+  targetFen = generatePosition(cfg.pieces);
+  const targetBoard = fenToBoard(targetFen);
+
+  document.getElementById('status-msg').textContent = '';
+  document.getElementById('status-msg').className = '';
+  document.getElementById('phase-label').textContent = 'memorise this position';
+  document.getElementById('submit-btn').classList.remove('visible');
+
+  updateHud();
+  renderBoard(targetBoard, true, false);
+
+  // Run display timer
+  runDisplayTimer(cfg.displayTime, () => {
+    // Fade out pieces
+    document.querySelectorAll('.piece').forEach(p => p.classList.add('fade-out'));
+    setTimeout(() => {
+      // Clear board and enter recall phase
+      renderBoard(emptyBoard(), false, false);
+      startRecallPhase();
+    }, 300);
+  });
+}
+
+function startRecallPhase() {
+  phase = 'recall';
+  selectedSq = null;
+  renderPlayerBoard();
+  document.getElementById('phase-label').textContent = 'reconstruct the position';
+  document.getElementById('submit-btn').classList.add('visible');
+  document.getElementById('timer-bar').style.width = '100%';
+  document.getElementById('timer-bar').style.background = 'var(--accent)';
+  document.getElementById('hudTime').textContent = '—';
+}
+
+function submitReconstruction() {
+  if (phase !== 'recall') return;
+  phase = 'feedback';
+  clearTimers();
+
+  const targetBoard = fenToBoard(targetFen);
+  const playerFen = boardToFen(playerBoard);
+  const isCorrect = playerFen === targetFen;
+
+  showResultOverlay(targetBoard, playerBoard);
+
+  sessionLog.push({
+    level: currentLevel + 1,
+    targetFen,
+    playerFen,
+    correct: isCorrect,
+  });
+
+  if (isCorrect) {
+    streak++;
+    levelDone++;
+    if (streak > getBestStreak()) saveBestStreak(streak);
+    document.getElementById('status-msg').textContent = 'correct';
+    document.getElementById('status-msg').className = 's-ok';
+    document.getElementById('submit-btn').classList.remove('visible');
+    updateHud();
+
+    if (levelDone >= NEEDED_PER_LEVEL) {
+      if (currentLevel + 1 > getBestLevel()) saveBestLevel(currentLevel + 1);
+      setTimeout(() => {
+        currentLevel++;
+        levelDone = 0;
+        nextPosition();
+      }, 800);
+    } else {
+      setTimeout(nextPosition, 800);
+    }
+  } else {
+    streak = 0;
+    document.getElementById('status-msg').textContent = 'wrong — pieces highlighted in red';
+    document.getElementById('status-msg').className = 's-err';
+    document.getElementById('submit-btn').classList.remove('visible');
+    setTimeout(showGameOver, 2000);
+  }
+}
+
+function showGameOver() {
+  phase = 'idle';
+  const reached = currentLevel + 1;
+  const best = getBestLevel();
+  const isNew = reached > best;
+  if (isNew) saveBestLevel(reached);
+  document.getElementById('goLevel').textContent = reached;
+  document.getElementById('goBest').textContent = Math.max(reached, best);
+  document.getElementById('goNewBest').style.display = isNew ? 'block' : 'none';
+  const correct = sessionLog.filter(r => r.correct).length;
+  document.getElementById('goSession').textContent =
+    `${sessionLog.length} positions · ${correct} correct · streak peak: ${getBestStreak()}`;
+  refreshBest();
+  show('gameover');
+}
+
+// ══════════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════════
+
+document.addEventListener('keydown', e => {
+  // Piece placement
+  if (phase === 'recall') {
+    const key = e.key.toLowerCase();
+    if (KEY_TO_PIECE[key]) {
+      e.preventDefault();
+      placePiece(KEY_TO_PIECE[key]);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      clearSelectedSquare();
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      placingWhite = !placingWhite;
+      updateColorIndicator();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitReconstruction();
+      return;
+    }
+  }
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (document.getElementById('gameover').classList.contains('active')) {
+      startSession();
+    }
+  }
+});
+
+document.getElementById('gameover').addEventListener('click', startSession);
+
+// ══════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════
+
+document.getElementById('startBtn').addEventListener('click', startSession);
+document.getElementById('retryBtn') && document.getElementById('retryBtn').addEventListener('click', startSession);
+
+refreshBest();
+updateColorIndicator();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
