@@ -674,7 +674,7 @@ function startPaceDrill() {
     wordsTyped: 0,
     charsTyped: 0,
     errors: 0,
-    sessionStart: Date.now(),
+    sessionStart: null,  // set after countdown
     wordTimers: [],
     wordStartTime: 0,
     peakWpm: 0,
@@ -694,10 +694,30 @@ function loadNextSet() {
   paceState.currentWordIdx = 0;
   paceState.setNumber++;
   renderWordStream();
-  startWordTimer(0);
   updatePaceHud();
-  document.getElementById('type-input').value = '';
-  document.getElementById('type-input').focus();
+
+  const input = document.getElementById('type-input');
+  input.value = '';
+  input.disabled = true;
+  input.classList.remove('error','success');
+
+  // Countdown before first word of each set
+  let count = 3;
+  document.getElementById('pace-label').textContent = `get ready... ${count}`;
+  const cd = setInterval(() => {
+    count--;
+    if (count > 0) {
+      document.getElementById('pace-label').textContent = `get ready... ${count}`;
+    } else {
+      clearInterval(cd);
+      document.getElementById('pace-label').textContent = 'type the highlighted word · space or enter to submit';
+      input.disabled = false;
+      input.focus();
+      paceState.wordStartTime = performance.now();
+      paceState.sessionStart = paceState.sessionStart || Date.now();
+      startWordTimer(0);
+    }
+  }, 1000);
 }
 
 function renderWordStream() {
@@ -711,7 +731,7 @@ function renderWordStream() {
     const timerBar = document.createElement('div');
     timerBar.className = 'word-timer-bar';
     timerBar.id = `word-timer-${i}`;
-    timerBar.style.width = '0px'; // hidden initially, shown for current
+    timerBar.style.width = '0px';
 
     const wordEl = document.createElement('div');
     wordEl.className = 'word-display ' + (i === 0 ? 'current' : 'upcoming');
@@ -725,16 +745,16 @@ function renderWordStream() {
 }
 
 let wordTimerFrame = null;
+let wordTransitioning = false; // prevent input during brief gap between words
 
 function startWordTimer(idx) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+  wordTransitioning = false;
   paceState.wordStartTime = performance.now();
   const duration = msPerWord();
   const timerEl = document.getElementById(`word-timer-${idx}`);
-  const wordRow = document.getElementById(`word-row-${idx}`);
+  const wordEl  = document.getElementById(`word-el-${idx}`);
 
-  // Set timer bar width to word text width
-  const wordEl = document.getElementById(`word-el-${idx}`);
   if (timerEl && wordEl) {
     timerEl.style.width = wordEl.offsetWidth + 'px';
   }
@@ -747,11 +767,9 @@ function startWordTimer(idx) {
       timerEl.style.width = Math.max(0, fullWidth * (1 - pct)) + 'px';
       timerEl.style.background = pct < 0.5 ? 'var(--accent)' : pct < 0.8 ? 'var(--warn)' : 'var(--danger)';
     }
-
     if (pct < 1) {
       wordTimerFrame = requestAnimationFrame(tick);
     } else {
-      // Time's up for this word — mark as missed
       wordMissed(idx);
     }
   }
@@ -760,11 +778,11 @@ function startWordTimer(idx) {
 
 function wordMissed(idx) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+  wordTransitioning = true;
   const word = paceState.currentSet[idx];
   const wordEl = document.getElementById(`word-el-${idx}`);
   if (wordEl) wordEl.className = 'word-display missed';
 
-  // Record all bigrams in missed word as errors
   for (let i = 0; i < word.length - 1; i++) {
     const bg = word[i] + word[i+1];
     recordBigram(bg, true, msPerWord());
@@ -774,21 +792,29 @@ function wordMissed(idx) {
   paceState.missedWords.push(word);
   paceState.errors++;
   paceState.currentWordIdx = idx + 1;
+  updatePaceHud();
+
+  // Clear input and brief pause before next word
+  const input = document.getElementById('type-input');
+  input.value = '';
+  input.classList.remove('error','success');
 
   if (paceState.currentWordIdx >= paceState.currentSet.length) {
-    setTimeout(loadNextSet, 400);
+    setTimeout(loadNextSet, 600);
   } else {
-    const nextEl = document.getElementById(`word-el-${paceState.currentWordIdx}`);
-    if (nextEl) nextEl.className = 'word-display current';
-    document.getElementById('type-input').value = '';
-    startWordTimer(paceState.currentWordIdx);
+    setTimeout(() => {
+      wordTransitioning = false;
+      const nextEl = document.getElementById(`word-el-${paceState.currentWordIdx}`);
+      if (nextEl) nextEl.className = 'word-display current';
+      input.focus();
+      startWordTimer(paceState.currentWordIdx);
+    }, 200);
   }
-  updatePaceHud();
 }
 
 function updatePaceHud() {
-  const elapsed = (Date.now() - paceState.sessionStart) / 60000;
-  const wpm = elapsed > 0 ? Math.round(paceState.wordsTyped / elapsed) : 0;
+  const elapsed = (Date.now() - (paceState.sessionStart || Date.now())) / 60000;
+  const wpm = elapsed > 0.01 ? Math.round(paceState.wordsTyped / elapsed) : 0;
   if (wpm > paceState.peakWpm) paceState.peakWpm = wpm;
 
   const total = paceState.wordsTyped + paceState.errors;
@@ -803,12 +829,11 @@ function updatePaceHud() {
     (paceState.currentWordIdx / wordsPerSet) * (100 / paceState.totalSets);
   document.getElementById('pace-progress').style.width = pct + '%';
 
-  // Rhythm score
   if (paceState.keyTimings.length >= 4) {
     const timings = paceState.keyTimings.slice(-20);
     const avg = timings.reduce((a,b) => a+b, 0) / timings.length;
     const variance = timings.reduce((s,t) => s + Math.pow(t - avg, 2), 0) / timings.length;
-    const cv = Math.sqrt(variance) / avg; // coefficient of variation
+    const cv = Math.sqrt(variance) / avg;
     const rhythmScore = Math.max(0, Math.round((1 - cv) * 100));
     document.getElementById('hudRhythm').textContent = rhythmScore + '%';
     const bar = document.getElementById('rhythm-bar');
@@ -824,6 +849,17 @@ function updatePaceHud() {
 document.getElementById('type-input').addEventListener('keydown', e => {
   if (e.key === 'Tab') { e.preventDefault(); return; }
 
+  // Enter key submits word explicitly
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = document.getElementById('type-input').value.trim();
+    const idx = paceState.currentWordIdx;
+    if (!wordTransitioning && val.length > 0 && idx < paceState.currentSet.length) {
+      handleWordSubmit(idx, val, paceState.currentSet[idx]);
+    }
+    return;
+  }
+
   // Track keystroke timing for rhythm
   const now = performance.now();
   if (paceState.lastKeyTime > 0) {
@@ -834,16 +870,23 @@ document.getElementById('type-input').addEventListener('keydown', e => {
 });
 
 document.getElementById('type-input').addEventListener('input', function() {
+  if (wordTransitioning) { this.value = ''; return; }
+
   const val = this.value;
   const idx = paceState.currentWordIdx;
   if (idx >= paceState.currentSet.length) return;
 
   const target = paceState.currentSet[idx];
 
-  // Check if word is complete (space or exact match at end)
-  if (val.endsWith(' ') || val === target) {
+  // Space submits only if there's actual content typed
+  if (val.endsWith(' ')) {
     const typed = val.trim();
-    handleWordSubmit(idx, typed, target);
+    if (typed.length > 0) {
+      handleWordSubmit(idx, typed, target);
+    } else {
+      // Empty space — just clear it, don't submit
+      this.value = '';
+    }
     return;
   }
 
@@ -855,6 +898,7 @@ document.getElementById('type-input').addEventListener('input', function() {
 
 function handleWordSubmit(idx, typed, target) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
+  wordTransitioning = true;
 
   const responseMs = performance.now() - paceState.wordStartTime;
   const isCorrect = typed === target;
@@ -862,7 +906,6 @@ function handleWordSubmit(idx, typed, target) {
   const wordEl = document.getElementById(`word-el-${idx}`);
   if (wordEl) wordEl.className = 'word-display ' + (isCorrect ? 'correct' : 'missed');
 
-  // Extract and record bigrams
   for (let i = 0; i < target.length - 1; i++) {
     const bg = target[i] + target[i+1];
     const bgMs = responseMs / Math.max(1, target.length);
@@ -872,11 +915,10 @@ function handleWordSubmit(idx, typed, target) {
     }
   }
 
-  // If error, also extract specific error bigrams
   if (!isCorrect) {
     const errBigrams = extractErrorBigrams(target, typed);
     errBigrams.forEach(bg => {
-      paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 2; // weight error bigrams higher
+      paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 2;
     });
     paceState.missedWords.push(target);
     paceState.errors++;
@@ -886,17 +928,25 @@ function handleWordSubmit(idx, typed, target) {
   }
 
   paceState.currentWordIdx = idx + 1;
-  document.getElementById('type-input').value = '';
-  document.getElementById('type-input').classList.remove('error', 'success');
+
+  // Immediately clear input
+  const input = document.getElementById('type-input');
+  input.value = '';
+  input.classList.remove('error','success');
 
   updatePaceHud();
 
   if (paceState.currentWordIdx >= paceState.currentSet.length) {
-    setTimeout(loadNextSet, 300);
+    setTimeout(loadNextSet, 400);
   } else {
-    const nextEl = document.getElementById(`word-el-${paceState.currentWordIdx}`);
-    if (nextEl) nextEl.className = 'word-display current';
-    startWordTimer(paceState.currentWordIdx);
+    // Brief gap before next word starts — gives you a moment to breathe
+    setTimeout(() => {
+      wordTransitioning = false;
+      const nextEl = document.getElementById(`word-el-${paceState.currentWordIdx}`);
+      if (nextEl) nextEl.className = 'word-display current';
+      input.focus();
+      startWordTimer(paceState.currentWordIdx);
+    }, 150);
   }
 }
 
@@ -1128,6 +1178,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
 </body>
 </html>
