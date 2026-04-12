@@ -280,7 +280,11 @@ body::after {
     <div class="section-label">pace drill settings</div>
     <div class="setting-row">
       <label>target WPM</label>
-      <input type="range" id="slWpm" min="60" max="220" step="5" value="100">
+      <input type="number" id="slWpm" min="40" max="220" step="1" value="100"
+        style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:2px;
+        color:var(--text);font-family:'Share Tech Mono',monospace;font-size:1rem;
+        padding:6px 10px;outline:none;width:80px;"
+        onfocus="this.select()">
       <span class="setting-val" id="outWpm">100 wpm</span>
     </div>
     <div class="setting-row">
@@ -852,10 +856,12 @@ document.getElementById('type-input').addEventListener('keydown', e => {
   // Enter key submits word explicitly
   if (e.key === 'Enter') {
     e.preventDefault();
-    const val = document.getElementById('type-input').value.trim();
+    const raw = document.getElementById('type-input').value.trim().toLowerCase();
     const idx = paceState.currentWordIdx;
-    if (!wordTransitioning && val.length > 0 && idx < paceState.currentSet.length) {
-      handleWordSubmit(idx, val, paceState.currentSet[idx]);
+    if (!wordTransitioning && raw.length > 0 && idx < paceState.currentSet.length) {
+      document.getElementById('type-input').value = '';
+      const target = paceState.currentSet[idx];
+      handleWordSubmit(idx, raw, target.toLowerCase(), target);
     }
     return;
   }
@@ -872,40 +878,46 @@ document.getElementById('type-input').addEventListener('keydown', e => {
 document.getElementById('type-input').addEventListener('input', function() {
   if (wordTransitioning) { this.value = ''; return; }
 
-  const val = this.value;
+  const raw = this.value;
+  const val = raw.trimEnd(); // preserve leading chars but strip trailing space
   const idx = paceState.currentWordIdx;
   if (idx >= paceState.currentSet.length) return;
 
   const target = paceState.currentSet[idx];
+  const targetClean = target.toLowerCase();
+  const valLower = val.toLowerCase();
 
-  // Space submits only if there's actual content typed
-  if (val.endsWith(' ')) {
-    const typed = val.trim();
+  // Space at end = submit
+  if (raw.endsWith(' ')) {
+    const typed = raw.trim();
     if (typed.length > 0) {
-      handleWordSubmit(idx, typed, target);
+      this.value = '';
+      handleWordSubmit(idx, typed.toLowerCase(), targetClean, target);
     } else {
-      // Empty space — just clear it, don't submit
       this.value = '';
     }
     return;
   }
 
+  // Exact match = auto-submit immediately, no space needed
+  if (valLower === targetClean && valLower.length > 0) {
+    this.value = '';
+    handleWordSubmit(idx, valLower, targetClean, target);
+    return;
+  }
+
   // Live error highlighting
-  const isCorrectSoFar = target.startsWith(val);
-  this.classList.toggle('error', !isCorrectSoFar && val.length > 0);
+  const isCorrectSoFar = targetClean.startsWith(valLower);
+  this.classList.toggle('error', !isCorrectSoFar && valLower.length > 0);
   this.classList.remove('success');
 });
 
-function handleWordSubmit(idx, typed, target) {
+function handleWordSubmit(idx, typedClean, targetClean, targetOriginal) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
   wordTransitioning = true;
 
-  // Normalize both sides — trim whitespace, lowercase
-  const typedClean = typed.trim().toLowerCase();
-  const targetClean = target.trim().toLowerCase();
   const isCorrect = typedClean === targetClean;
-
-  console.log(`[ColdType] word: "${target}" | typed: "${typed}" | clean: "${typedClean}" | correct: ${isCorrect}`);
+  console.log(`[ColdType] target: "${targetOriginal}" | typed: "${typedClean}" | correct: ${isCorrect}`);
 
   const responseMs = performance.now() - paceState.wordStartTime;
 
@@ -1176,6 +1188,31 @@ function endClinic() {
 
 document.getElementById('startPaceBtn').addEventListener('click', startPaceDrill);
 
+// WPM input — number field, update on change
+document.getElementById('slWpm').addEventListener('input', function() {
+  const val = parseInt(this.value);
+  if (!isNaN(val) && val >= 40 && val <= 220) {
+    targetWpm = val;
+    document.getElementById('outWpm').textContent = val + ' wpm';
+  }
+});
+document.getElementById('slWpm').addEventListener('change', function() {
+  const val = parseInt(this.value);
+  if (!isNaN(val)) {
+    targetWpm = Math.max(40, Math.min(220, val));
+    this.value = targetWpm;
+    document.getElementById('outWpm').textContent = targetWpm + ' wpm';
+  }
+});
+document.getElementById('slWords').addEventListener('input', function() {
+  wordsPerSet = parseInt(this.value);
+  document.getElementById('outWords').textContent = this.value;
+});
+document.getElementById('slSets').addEventListener('input', function() {
+  setsPerSession = parseInt(this.value);
+  document.getElementById('outSets').textContent = this.value;
+});
+
 // ══════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════
@@ -1184,6 +1221,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.2</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.3</div>
 </body>
 </html>
