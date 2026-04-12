@@ -900,8 +900,14 @@ function handleWordSubmit(idx, typed, target) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
   wordTransitioning = true;
 
+  // Normalize both sides — trim whitespace, lowercase
+  const typedClean = typed.trim().toLowerCase();
+  const targetClean = target.trim().toLowerCase();
+  const isCorrect = typedClean === targetClean;
+
+  console.log(`[ColdType] word: "${target}" | typed: "${typed}" | clean: "${typedClean}" | correct: ${isCorrect}`);
+
   const responseMs = performance.now() - paceState.wordStartTime;
-  const isCorrect = typed === target;
 
   const wordEl = document.getElementById(`word-el-${idx}`);
   if (wordEl) wordEl.className = 'word-display ' + (isCorrect ? 'correct' : 'missed');
@@ -916,7 +922,7 @@ function handleWordSubmit(idx, typed, target) {
   }
 
   if (!isCorrect) {
-    const errBigrams = extractErrorBigrams(target, typed);
+    const errBigrams = extractErrorBigrams(targetClean, typedClean);
     errBigrams.forEach(bg => {
       paceState.errorBigrams[bg] = (paceState.errorBigrams[bg] || 0) + 2;
     });
@@ -1178,6 +1184,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.2</div>
 </body>
 </html>
