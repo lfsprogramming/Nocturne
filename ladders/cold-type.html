@@ -583,6 +583,7 @@ function generateSet(n) {
     }
     words.push(w);
   }
+  console.log('[ColdType] generated set:', words);
   return words;
 }
 
@@ -743,7 +744,6 @@ function renderWordStream() {
 }
 
 let wordTimerFrame = null;
-let  // prevent input during brief gap between words
 
 function startWordTimer(idx) {
   if (wordTimerFrame) cancelAnimationFrame(wordTimerFrame);
@@ -888,6 +888,7 @@ document.getElementById('type-input').addEventListener('input', function() {
   if (raw.endsWith(' ')) {
     const typed = raw.trim();
     if (typed.length > 0) {
+      console.log('[ColdType] space submit - raw:', JSON.stringify(raw), 'typed:', JSON.stringify(typed), 'target:', JSON.stringify(target));
       this.value = '';
       handleWordSubmit(idx, typed.toLowerCase(), targetClean, target);
     } else {
@@ -1224,6 +1225,6 @@ loadProfile();
 refreshSetupStats();
 renderWeaknessPreview();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.3</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.5</div>
 </body>
 </html>
