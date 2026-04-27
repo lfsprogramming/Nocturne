@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Lever — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0804;
+  --surface: #141008;
+  --border: #2a1f0a;
+  --amber: #d4861a;
+  --amber-dim: #8a5510;
+  --amber-glow: rgba(212,134,26,0.15);
+  --gold: #f0c040;
+  --gold-bright: #ffe080;
+  --text: #c8b090;
+  --muted: #5a4a30;
+  --dark: #060402;
+  --red: #c04040;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 6px);
+  pointer-events: none; z-index: 1000;
+}
+
+#particles { position: fixed; inset: 0; pointer-events: none; z-index: 500; }
+
+.wrap {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 36px; padding: 40px 20px; position: relative; z-index: 1;
+  width: 100%; max-width: 420px;
+}
+
+.title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem; letter-spacing: 0.4em; color: var(--muted); text-transform: uppercase;
+}
+
+/* sync status */
+#sync-status {
+  font-size: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted); min-height: 14px; text-align: center; transition: color 0.3s;
+}
+#sync-status.syncing { color: var(--amber); }
+#sync-status.ok      { color: #608060; }
+#sync-status.err     { color: var(--red); }
+
+/* balance */
+.balance-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.balance-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; }
+
+#balance {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(5rem, 22vw, 10rem); line-height: 1;
+  color: var(--gold); letter-spacing: 0.05em;
+  text-shadow: 0 0 40px rgba(240,192,64,0.4), 0 0 80px rgba(240,192,64,0.15);
+  transition: color 0.1s; user-select: none;
+}
+#balance.flash {
+  color: var(--gold-bright);
+  text-shadow: 0 0 60px rgba(255,224,128,0.8), 0 0 120px rgba(255,224,128,0.4);
+}
+#balance.flash-spend {
+  color: #c08030;
+  text-shadow: 0 0 40px rgba(192,128,48,0.5);
+}
+
+.balance-sub { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; }
+
+/* floating numbers */
+.float-num {
+  position: fixed; font-family: 'Bebas Neue', sans-serif; font-size: 2rem;
+  pointer-events: none; z-index: 600;
+  animation: floatUp 1.2s ease-out forwards; user-select: none;
+}
+.float-num.earn  { color: var(--gold-bright); text-shadow: 0 0 20px rgba(255,224,128,0.8); }
+.float-num.spend { color: #c06030; text-shadow: 0 0 20px rgba(192,96,48,0.8); }
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  30%  { opacity: 1; transform: translateY(-20px) scale(1.3); }
+  100% { opacity: 0; transform: translateY(-80px) scale(0.8); }
+}
+
+/* earn button */
+.earn-btn {
+  position: relative;
+  width: clamp(150px, 38vw, 210px); height: clamp(150px, 38vw, 210px);
+  border-radius: 50%; border: 2px solid var(--amber-dim);
+  background: radial-gradient(ellipse at 40% 35%, #1f1408, #0a0804);
+  color: var(--amber); font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem; letter-spacing: 0.2em; cursor: pointer;
+  transition: all 0.1s;
+  box-shadow: 0 0 30px rgba(212,134,26,0.08), inset 0 1px 0 rgba(212,134,26,0.1);
+  -webkit-tap-highlight-color: transparent; outline: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  user-select: none;
+}
+.earn-btn:hover { border-color: var(--amber); color: var(--gold); box-shadow: 0 0 50px rgba(212,134,26,0.2), inset 0 1px 0 rgba(212,134,26,0.15); }
+.earn-btn:active, .earn-btn.pressed { transform: scale(0.94); box-shadow: 0 0 80px rgba(240,192,64,0.3), inset 0 0 20px rgba(240,192,64,0.1); border-color: var(--gold); color: var(--gold-bright); }
+.earn-btn-icon { font-size: 2.2rem; line-height: 1; opacity: 0.9; }
+.earn-btn::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--gold); opacity: 0; transform: scale(1); }
+.earn-btn.ring::after { animation: ringPulse 0.6s ease-out forwards; }
+@keyframes ringPulse { 0% { opacity: 0.8; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
+
+/* action buttons row */
+.action-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+.action-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.15em;
+  padding: 10px 20px; border-radius: 2px; cursor: pointer;
+  transition: all 0.15s; border: 1px solid; min-width: 80px;
+  -webkit-tap-highlight-color: transparent;
+}
+.action-btn.spend-btn { border-color: #5a2a0a; color: #c06030; background: transparent; }
+.action-btn.spend-btn:hover { background: #5a2a0a; color: #f08040; }
+
+/* amount selector */
+.amount-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.amt-btn {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.1em;
+  padding: 7px 14px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); cursor: pointer; border-radius: 2px; transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.amt-btn:hover { border-color: var(--muted); color: var(--text); }
+.amt-btn.active { border-color: var(--amber); color: var(--gold); background: var(--amber-glow); }
+
+/* session info */
+.session-info { display: flex; gap: 28px; justify-content: center; }
+.sess-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sess-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--amber); line-height: 1; }
+.sess-lbl { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+
+/* controls */
+.controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.ctrl-btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.55rem; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 6px 12px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer; border-radius: 2px; transition: all 0.15s;
+}
+.ctrl-btn:hover { border-color: var(--muted); color: var(--text); }
+.ctrl-btn.danger:hover { border-color: #8a3030; color: #c05050; }
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="wrap">
+  <div class="title">The Lever</div>
+  <div id="sync-status">connecting...</div>
+
+  <div class="balance-wrap">
+    <div class="balance-label">current balance</div>
+    <div id="balance">—</div>
+    <div class="balance-sub" id="balanceSub"></div>
+  </div>
+
+  <div class="amount-row">
+    <button class="amt-btn active" data-amt="1">+1</button>
+    <button class="amt-btn" data-amt="5">+5</button>
+    <button class="amt-btn" data-amt="10">+10</button>
+    <button class="amt-btn" data-amt="25">+25</button>
+  </div>
+
+  <button class="earn-btn" id="earnBtn">
+    <div class="earn-btn-icon">✦</div>
+    <div id="earnBtnLabel">earn</div>
+  </button>
+
+  <div class="action-row">
+    <button class="action-btn spend-btn" id="spendBtn">− spend</button>
+  </div>
+
+  <div class="session-info">
+    <div class="sess-item"><div class="sess-val" id="sessEarned">0</div><div class="sess-lbl">this session</div></div>
+    <div class="sess-item"><div class="sess-val" id="sessSpent">0</div><div class="sess-lbl">spent today</div></div>
+    <div class="sess-item"><div class="sess-val" id="totalEarned">—</div><div class="sess-lbl">all time</div></div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="exportBackup()">↓ backup</button>
+    <button class="ctrl-btn danger" onclick="confirmReset()">reset</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// SUPABASE CONFIG
+// ══════════════════════════════════════════════════
+
+const SUPABASE_URL = 'https://rthghgzdwqnlzvsoerhz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RvrKhg03c_vSx1wYwpSNFw_oRVuTVCQ';
+
+async function sbFetch(path, options = {}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal',
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+  // Return JSON if there's a body
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function getBalance() {
+  // Sum all transactions
+  const rows = await sbFetch('actor_bucks?select=type,amount', {
+    headers: { 'Prefer': 'return=representation' }
+  });
+  if (!rows) return 0;
+  return rows.reduce((sum, r) => {
+    return sum + (r.type === 'earn' ? r.amount : -r.amount);
+  }, 0);
+}
+
+async function getTotalEarned() {
+  const rows = await sbFetch('actor_bucks?select=amount&type=eq.earn', {
+    headers: { 'Prefer': 'return=representation' }
+  });
+  if (!rows) return 0;
+  return rows.reduce((sum, r) => sum + r.amount, 0);
+}
+
+async function logTransaction(type, amount, note = null) {
+  await sbFetch('actor_bucks', {
+    method: 'POST',
+    body: JSON.stringify({ type, amount, note }),
+  });
+}
+
+async function getAllRows() {
+  return await sbFetch('actor_bucks?select=*&order=created_at.desc', {
+    headers: { 'Prefer': 'return=representation' }
+  });
+}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let balance = 0;
+let totalEarned = 0;
+let sessEarned = 0;
+let sessSpent = 0;
+let selectedAmount = 1;
+let syncing = false;
+
+// ══════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════
+
+function setSync(state, msg = '') {
+  const el = document.getElementById('sync-status');
+  el.className = state;
+  el.textContent = msg;
+}
+
+function render() {
+  document.getElementById('balance').textContent = balance;
+  document.getElementById('balanceSub').textContent =
+    balance === 0 ? 'no bucks yet' :
+    balance === 1 ? '1 actor buck' :
+    `${balance} actor bucks`;
+  document.getElementById('sessEarned').textContent = sessEarned;
+  document.getElementById('sessSpent').textContent = sessSpent;
+  document.getElementById('totalEarned').textContent = totalEarned;
+  document.getElementById('earnBtnLabel').textContent =
+    selectedAmount === 1 ? 'earn' : `earn ${selectedAmount}`;
+}
+
+function flashBalance(type) {
+  const el = document.getElementById('balance');
+  el.classList.add(type === 'earn' ? 'flash' : 'flash-spend');
+  setTimeout(() => el.classList.remove('flash', 'flash-spend'), 350);
+}
+
+function showFloat(amount, type, x, y) {
+  const el = document.createElement('div');
+  el.className = 'float-num ' + type;
+  el.textContent = (type === 'earn' ? '+' : '−') + amount;
+  el.style.left = (x - 24) + 'px';
+  el.style.top  = (y - 24) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+function ringPulse() {
+  const btn = document.getElementById('earnBtn');
+  btn.classList.remove('ring');
+  void btn.offsetWidth;
+  btn.classList.add('ring');
+  setTimeout(() => btn.classList.remove('ring'), 600);
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let particleList = [];
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function spawnParticles(x, y, type, count = 12) {
+  const colors = type === 'earn'
+    ? ['#f0c040','#d4861a','#ffe080']
+    : ['#c06030','#8a3010','#e08040'];
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+    const speed = 2 + Math.random() * 4;
+    particleList.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      size: 2 + Math.random() * 3,
+      alpha: 1,
+      color: colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+}
+
+function animateParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particleList = particleList.filter(p => p.alpha > 0);
+  particleList.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.alpha -= 0.025;
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// ══════════════════════════════════════════════════
+// TRANSACTIONS
+// ══════════════════════════════════════════════════
+
+async function earn(x, y) {
+  if (syncing) return;
+  syncing = true;
+  const amount = selectedAmount;
+
+  // Optimistic update
+  balance += amount;
+  totalEarned += amount;
+  sessEarned += amount;
+  render();
+  flashBalance('earn');
+  ringPulse();
+  showFloat(amount, 'earn', x, y);
+  spawnParticles(x, y, 'earn', amount === 1 ? 10 : 16);
+
+  try {
+    setSync('syncing', 'saving...');
+    await logTransaction('earn', amount);
+    setSync('ok', 'saved ✓');
+    setTimeout(() => setSync('', ''), 2000);
+  } catch(e) {
+    // Rollback
+    balance -= amount;
+    totalEarned -= amount;
+    sessEarned -= amount;
+    render();
+    setSync('err', 'sync failed — check connection');
+    console.error(e);
+  }
+  syncing = false;
+}
+
+async function spend(x, y) {
+  if (syncing) return;
+  const amount = selectedAmount;
+  if (balance < amount) {
+    setSync('err', `not enough bucks (need ${amount}, have ${balance})`);
+    setTimeout(() => setSync('', ''), 3000);
+    return;
+  }
+  syncing = true;
+
+  // Optimistic update
+  balance -= amount;
+  sessSpent += amount;
+  render();
+  flashBalance('spend');
+  showFloat(amount, 'spend', x, y);
+  spawnParticles(x, y, 'spend', 8);
+
+  try {
+    setSync('syncing', 'saving...');
+    await logTransaction('spend', amount);
+    setSync('ok', 'saved ✓');
+    setTimeout(() => setSync('', ''), 2000);
+  } catch(e) {
+    // Rollback
+    balance += amount;
+    sessSpent -= amount;
+    render();
+    setSync('err', 'sync failed — check connection');
+    console.error(e);
+  }
+  syncing = false;
+}
+
+// ══════════════════════════════════════════════════
+// INIT — load balance from Supabase
+// ══════════════════════════════════════════════════
+
+async function init() {
+  setSync('syncing', 'loading...');
+  try {
+    const [bal, tot] = await Promise.all([getBalance(), getTotalEarned()]);
+    balance = bal;
+    totalEarned = tot;
+    render();
+    setSync('ok', 'connected ✓');
+    setTimeout(() => setSync('', ''), 2000);
+  } catch(e) {
+    setSync('err', 'could not connect — working offline');
+    balance = parseInt(localStorage.getItem('ab_balance_fallback') || '0');
+    render();
+    console.error(e);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// EXPORT / RESET
+// ══════════════════════════════════════════════════
+
+async function exportBackup() {
+  try {
+    const rows = await getAllRows();
+    const data = { exported: new Date().toISOString(), balance, totalEarned, transactions: rows };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `actor-bucks-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+  } catch(e) {
+    alert('Export failed: ' + e.message);
+  }
+}
+
+async function confirmReset() {
+  if (confirm(`Reset balance to 0?\n\nThis logs a spend transaction for your full balance (${balance} bucks) so your history is preserved.\n\nCurrent balance: ${balance}`)) {
+    if (balance > 0) await logTransaction('spend', balance, 'manual reset');
+    balance = 0;
+    render();
+    setSync('ok', 'reset complete');
+    setTimeout(() => setSync('', ''), 2000);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+// Amount selector
+document.querySelectorAll('.amt-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.amt-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    selectedAmount = parseInt(this.dataset.amt);
+    render();
+  });
+});
+
+// Earn button
+document.getElementById('earnBtn').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  earn(rect.left + rect.width/2, rect.top + rect.height/2);
+  this.classList.add('pressed');
+  setTimeout(() => this.classList.remove('pressed'), 120);
+});
+
+document.getElementById('earnBtn').addEventListener('touchend', function(e) {
+  e.preventDefault();
+  const rect = this.getBoundingClientRect();
+  earn(rect.left + rect.width/2, rect.top + rect.height/2);
+});
+
+// Spend button
+document.getElementById('spendBtn').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  spend(rect.left + rect.width/2, rect.top + rect.height/2);
+});
+
+document.getElementById('spendBtn').addEventListener('touchend', function(e) {
+  e.preventDefault();
+  const rect = this.getBoundingClientRect();
+  spend(rect.left + rect.width/2, rect.top + rect.height/2);
+});
+
+// Space bar = earn
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    const btn = document.getElementById('earnBtn');
+    const rect = btn.getBoundingClientRect();
+    earn(rect.left + rect.width/2, rect.top + rect.height/2);
+    btn.classList.add('pressed');
+    setTimeout(() => btn.classList.remove('pressed'), 120);
+  }
+});
+
+// Start
+init();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0804;
+  --surface: #141008;
+  --border: #2a1f0a;
+  --amber: #d4861a;
+  --amber-dim: #8a5510;
+  --amber-glow: rgba(212,134,26,0.15);
+  --gold: #f0c040;
+  --gold-bright: #ffe080;
+  --text: #c8b090;
+  --muted: #5a4a30;
+  --dark: #060402;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* subtle scanline */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 6px
+  );
+  pointer-events: none; z-index: 1000;
+}
+
+/* particle canvas */
+#particles {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 500;
+}
+
+/* main layout */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  padding: 40px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* title */
+.title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.4em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* balance display */
+.balance-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.balance-label {
+  font-size: 0.55rem;
+  color: var(--muted);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+
+#balance {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(5rem, 20vw, 10rem);
+  line-height: 1;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  text-shadow:
+    0 0 40px rgba(240,192,64,0.4),
+    0 0 80px rgba(240,192,64,0.15);
+  transition: color 0.1s;
+  user-select: none;
+}
+
+#balance.flash {
+  color: var(--gold-bright);
+  text-shadow:
+    0 0 60px rgba(255,224,128,0.8),
+    0 0 120px rgba(255,224,128,0.4);
+}
+
+.balance-sub {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+}
+
+/* floating +1 numbers */
+.float-num {
+  position: fixed;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  color: var(--gold-bright);
+  text-shadow: 0 0 20px rgba(255,224,128,0.8);
+  pointer-events: none;
+  z-index: 600;
+  animation: floatUp 1.2s ease-out forwards;
+  user-select: none;
+}
+
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  30%  { opacity: 1; transform: translateY(-20px) scale(1.3); }
+  100% { opacity: 0; transform: translateY(-80px) scale(0.8); }
+}
+
+/* earn button */
+.earn-btn {
+  position: relative;
+  width: clamp(160px, 40vw, 220px);
+  height: clamp(160px, 40vw, 220px);
+  border-radius: 50%;
+  border: 2px solid var(--amber-dim);
+  background: radial-gradient(ellipse at 40% 35%, #1f1408, #0a0804);
+  color: var(--amber);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  transition: all 0.1s;
+  box-shadow:
+    0 0 30px rgba(212,134,26,0.08),
+    inset 0 1px 0 rgba(212,134,26,0.1);
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.earn-btn:hover {
+  border-color: var(--amber);
+  box-shadow:
+    0 0 50px rgba(212,134,26,0.2),
+    inset 0 1px 0 rgba(212,134,26,0.15);
+  color: var(--gold);
+}
+
+.earn-btn:active, .earn-btn.pressed {
+  transform: scale(0.94);
+  box-shadow:
+    0 0 80px rgba(240,192,64,0.3),
+    inset 0 0 20px rgba(240,192,64,0.1);
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+.earn-btn-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.earn-btn-text {
+  font-size: 0.9rem;
+  letter-spacing: 0.25em;
+}
+
+/* ring pulse on press */
+.earn-btn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  opacity: 0;
+  transform: scale(1);
+}
+
+.earn-btn.ring::after {
+  animation: ringPulse 0.6s ease-out forwards;
+}
+
+@keyframes ringPulse {
+  0%   { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.3); }
+}
+
+/* session info */
+.session-info {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+}
+
+.sess-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sess-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  color: var(--amber);
+  line-height: 1;
+}
+
+.sess-lbl {
+  font-size: 0.5rem;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+/* bottom controls */
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ctrl-btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+
+.ctrl-btn:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.ctrl-btn.danger:hover {
+  border-color: #8a3030;
+  color: #c05050;
+}
+
+/* custom add panel */
+.add-panel {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-panel.visible { display: flex; }
+
+.add-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--gold);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  padding: 8px 16px;
+  width: 140px;
+  text-align: center;
+  outline: none;
+  letter-spacing: 0.1em;
+}
+
+.add-input:focus { border-color: var(--amber); }
+
+.add-confirm {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 20px;
+  border: 1px solid var(--amber-dim);
+  background: transparent;
+  color: var(--amber);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+
+.add-confirm:hover { background: var(--amber); color: #000; }
+
+/* message area for future use */
+#message-area {
+  min-height: 20px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-align: center;
+  font-style: italic;
+  transition: opacity 0.3s;
+}
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="wrap">
+  <div class="title">The Lever</div>
+
+  <div class="balance-wrap">
+    <div class="balance-label">current balance</div>
+    <div id="balance">0</div>
+    <div class="balance-sub" id="balanceSub">—</div>
+  </div>
+
+  <button class="earn-btn" id="earnBtn">
+    <div class="earn-btn-icon">✦</div>
+    <div class="earn-btn-text">earn</div>
+  </button>
+
+  <div class="session-info">
+    <div class="sess-item">
+      <div class="sess-val" id="sessEarned">0</div>
+      <div class="sess-lbl">this session</div>
+    </div>
+    <div class="sess-item">
+      <div class="sess-val" id="totalEarned">0</div>
+      <div class="sess-lbl">all time</div>
+    </div>
+  </div>
+
+  <div id="message-area"></div>
+
+  <div class="add-panel" id="addPanel">
+    <input class="add-input" id="addInput" type="number" min="1" max="999" placeholder="0">
+    <button class="add-confirm" id="addConfirm">add bucks</button>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAddPanel()">+ add many</button>
+    <button class="ctrl-btn" onclick="toggleSpendPanel()">− spend</button>
+    <button class="ctrl-btn" onclick="exportData()">↓ backup</button>
+    <button class="ctrl-btn danger" onclick="confirmReset()">reset</button>
+  </div>
+
+  <div class="add-panel" id="spendPanel">
+    <input class="add-input" id="spendInput" type="number" min="1" max="999" placeholder="0">
+    <button class="add-confirm" id="spendConfirm" style="border-color:var(--amber-dim);color:var(--amber)">spend bucks</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════════
+
+const SUPABASE_URL = 'https://rthghgzdwqnlzvsoerhz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RvrKhg03c_vSx1wYwpSNFw_oRVuTVCQ';
+
+async function sbFetch(path, options = {}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || '',
+    },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function logTransaction(type, amount, note = '') {
+  await sbFetch('actor_bucks', {
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: JSON.stringify({ type, amount, note }),
+  });
+}
+
+async function fetchBalance() {
+  // Sum all earn transactions minus all spend transactions
+  const rows = await sbFetch('actor_bucks?select=type,amount');
+  if (!rows) return { balance: 0, totalEarned: 0 };
+  let balance = 0, totalEarned = 0;
+  for (const row of rows) {
+    if (row.type === 'earn') {
+      balance += row.amount;
+      totalEarned += row.amount;
+    } else {
+      balance -= row.amount;
+    }
+  }
+  return { balance, totalEarned };
+}
+
+// ══════════════════════════════════════════════════
+// STORAGE — localStorage as fast cache, Supabase as source of truth
+// ══════════════════════════════════════════════════
+
+function loadCache() {
+  return {
+    balance:     parseInt(localStorage.getItem('ab_balance')     || '0'),
+    totalEarned: parseInt(localStorage.getItem('ab_totalEarned') || '0'),
+  };
+}
+
+function saveCache(data) {
+  localStorage.setItem('ab_balance',     data.balance);
+  localStorage.setItem('ab_totalEarned', data.totalEarned);
+}
+
+function load() { return loadCache(); }
+function save(data) { saveCache(data); }
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+
+let state = load();
+let sessEarned = 0;
+
+// PAO actor names for balance display (00-09 shown as fun labels)
+// You can expand this to your full 100-person list
+const ACTOR_LABELS = [
+  null, // 0 = no label
+];
+
+function getPaoLabel(n) {
+  // Simple milestone labels — replace with your actual PAO list later
+  if (n === 0) return '—';
+  const actor = Math.floor(n / 10) * 10;
+  const remainder = n % 10;
+  return `${String(n).padStart(2,'0')} actors earned`;
+}
+
+// ══════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════
+
+function render() {
+  document.getElementById('balance').textContent = state.balance;
+  document.getElementById('balanceSub').textContent = getPaoLabel(state.balance);
+  document.getElementById('sessEarned').textContent = sessEarned;
+  document.getElementById('totalEarned').textContent = state.totalEarned;
+}
+
+function flashBalance() {
+  const el = document.getElementById('balance');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 300);
+}
+
+function showFloatingNumber(amount, x, y) {
+  const el = document.createElement('div');
+  el.className = 'float-num';
+  el.textContent = '+' + amount;
+  el.style.left = (x - 20) + 'px';
+  el.style.top  = (y - 20) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+function ringPulse() {
+  const btn = document.getElementById('earnBtn');
+  btn.classList.remove('ring');
+  void btn.offsetWidth; // reflow
+  btn.classList.add('ring');
+  setTimeout(() => btn.classList.remove('ring'), 600);
+}
+
+// ══════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════
+
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let particleList = [];
+
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function spawnParticles(x, y, count = 12) {
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+    const speed = 2 + Math.random() * 4;
+    particleList.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      size: 2 + Math.random() * 3,
+      alpha: 1,
+      color: Math.random() < 0.6 ? '#f0c040' : '#d4861a',
+    });
+  }
+}
+
+function animateParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particleList = particleList.filter(p => p.alpha > 0);
+  particleList.forEach(p => {
+    p.x    += p.vx;
+    p.y    += p.vy;
+    p.vy   += 0.15;
+    p.alpha -= 0.025;
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle   = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur  = 6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// ══════════════════════════════════════════════════
+// EARN
+// ══════════════════════════════════════════════════
+
+function earn(amount, x, y) {
+  // Optimistic update — update UI immediately
+  state.balance     += amount;
+  state.totalEarned += amount;
+  sessEarned        += amount;
+  save(state);
+  render();
+  flashBalance();
+  ringPulse();
+  if (x && y) {
+    showFloatingNumber(amount, x, y);
+    spawnParticles(x, y, amount === 1 ? 10 : 18);
+  }
+  // Log to Supabase in background
+  logTransaction('earn', amount).catch(e => {
+    console.warn('Supabase sync failed:', e);
+  });
+}
+
+function spend(amount) {
+  if (state.balance < amount) {
+    showMessage(`not enough bucks (need ${amount}, have ${state.balance})`);
+    return;
+  }
+  state.balance -= amount;
+  save(state);
+  render();
+  // Log to Supabase
+  logTransaction('spend', amount).catch(e => {
+    console.warn('Supabase sync failed:', e);
+  });
+}
+
+// ══════════════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════════════
+
+function toggleAddPanel() {
+  const panel = document.getElementById('addPanel');
+  panel.classList.toggle('visible');
+  if (panel.classList.contains('visible')) {
+    document.getElementById('addInput').focus();
+  }
+}
+
+function confirmReset() {
+  if (confirm(`Reset balance to 0? Current balance: ${state.balance} Actor Bucks.\n\nThis cannot be undone.`)) {
+    state.balance = 0;
+    sessEarned = 0;
+    save(state);
+    render();
+  }
+}
+
+function exportData() {
+  const data = {
+    exported: new Date().toISOString(),
+    balance: state.balance,
+    totalEarned: state.totalEarned,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `actor-bucks-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ══════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════
+
+document.getElementById('earnBtn').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
+  earn(1, cx, cy);
+  this.classList.add('pressed');
+  setTimeout(() => this.classList.remove('pressed'), 120);
+});
+
+document.getElementById('earnBtn').addEventListener('touchend', function(e) {
+  e.preventDefault();
+  const rect = this.getBoundingClientRect();
+  earn(1, rect.left + rect.width/2, rect.top + rect.height/2);
+});
+
+document.getElementById('addConfirm').addEventListener('click', function() {
+  const val = parseInt(document.getElementById('addInput').value);
+  if (!isNaN(val) && val > 0) {
+    const btn = document.getElementById('earnBtn');
+    const rect = btn.getBoundingClientRect();
+    earn(val, rect.left + rect.width/2, rect.top + rect.height/2);
+    document.getElementById('addInput').value = '';
+    document.getElementById('addPanel').classList.remove('visible');
+  }
+});
+
+document.getElementById('addInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('addConfirm').click();
+  if (e.key === 'Escape') document.getElementById('addPanel').classList.remove('visible');
+});
+
+// Space bar also earns
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    const btn = document.getElementById('earnBtn');
+    const rect = btn.getBoundingClientRect();
+    earn(1, rect.left + rect.width/2, rect.top + rect.height/2);
+    btn.classList.add('pressed');
+    setTimeout(() => btn.classList.remove('pressed'), 120);
+  }
+});
+
+function showMessage(msg, duration = 3000) {
+  const el = document.getElementById('message-area');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, duration);
+}
+
+// ══════════════════════════════════════════════════
+// INIT — load from cache immediately, sync from Supabase
+// ══════════════════════════════════════════════════
+
+async function syncFromSupabase() {
+  try {
+    showMessage('syncing...', 2000);
+    const remote = await fetchBalance();
+    // Remote is source of truth
+    state.balance     = remote.balance;
+    state.totalEarned = remote.totalEarned;
+    save(state);
+    render();
+    showMessage('synced ✓', 1500);
+  } catch(e) {
+    showMessage('offline — using local data', 3000);
+    console.warn('Supabase sync failed:', e);
+  }
+}
+
+function toggleSpendPanel() {
+  const panel = document.getElementById('spendPanel');
+  document.getElementById('addPanel').classList.remove('visible');
+  panel.classList.toggle('visible');
+  if (panel.classList.contains('visible')) {
+    document.getElementById('spendInput').focus();
+  }
+}
+
+document.getElementById('spendConfirm').addEventListener('click', function() {
+  const val = parseInt(document.getElementById('spendInput').value);
+  if (!isNaN(val) && val > 0) {
+    spend(val);
+    document.getElementById('spendInput').value = '';
+    document.getElementById('spendPanel').classList.remove('visible');
+  }
+});
+
+document.getElementById('spendInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('spendConfirm').click();
+  if (e.key === 'Escape') document.getElementById('spendPanel').classList.remove('visible');
+});
+
+// INIT
+render();
+syncFromSupabase();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
+</body>
+</html>
