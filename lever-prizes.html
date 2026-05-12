@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prizes — The Lever</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0804; --surface:#141008; --border:#2a1f0a;
+  --berry:#7040c0; --berry-bright:#a060ff; --berry-dim:#3a1f6a;
+  --gold:#f0c040; --text:#c8b090; --muted:#5a4a30; --danger:#c04040;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 48px;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.05) 3px,rgba(0,0,0,0.05) 6px);pointer-events:none;z-index:1000;}
+.page{width:100%;max-width:440px;display:flex;flex-direction:column;gap:20px;}
+.header{display:flex;align-items:center;justify-content:space-between;}
+.title{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:0.2em;color:var(--berry-bright);}
+.back-btn{font-family:'Share Tech Mono',monospace;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;border-radius:2px;text-decoration:none;}
+.back-btn:hover{border-color:var(--muted);color:var(--text);}
+#status{font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);min-height:14px;text-align:center;}
+#status.ok{color:#608060;} #status.err{color:var(--danger);}
+
+/* prize list */
+.prize-list{display:flex;flex-direction:column;gap:8px;}
+.prize-item{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.prize-item-header{display:flex;align-items:center;justify-content:space-between;}
+.prize-item-name{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:var(--text);}
+.prize-item-cost{font-size:0.55rem;color:var(--berry-bright);letter-spacing:0.1em;}
+.prize-item-btns{display:flex;gap:6px;}
+.item-btn{font-family:'Share Tech Mono',monospace;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:4px 8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;border-radius:2px;transition:all 0.12s;}
+.item-btn:hover{border-color:var(--muted);color:var(--text);}
+.item-btn.del:hover{border-color:var(--danger);color:var(--danger);}
+
+/* conditions */
+.conditions-wrap{display:flex;flex-direction:column;gap:4px;}
+.cond-label{font-size:0.48rem;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
+.cond-row{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:5px 8px;}
+.cond-key{flex:1;font-size:0.55rem;color:var(--text);word-break:break-all;}
+.cond-val{font-size:0.55rem;font-family:'Bebas Neue',sans-serif;letter-spacing:0.1em;}
+.cond-val.true{color:#60a060;} .cond-val.false{color:var(--muted);}
+.cond-toggle{font-size:0.48rem;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;border-radius:2px;}
+.cond-del{font-size:0.48rem;padding:3px 6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;border-radius:2px;}
+.cond-del:hover{border-color:var(--danger);color:var(--danger);}
+.add-cond-row{display:flex;gap:6px;}
+.cond-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:2px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.55rem;padding:5px 8px;outline:none;}
+.cond-input:focus{border-color:var(--berry);}
+.cond-add-btn{font-family:'Share Tech Mono',monospace;font-size:0.5rem;padding:5px 8px;border:1px solid var(--berry-dim);background:transparent;color:var(--berry);cursor:pointer;border-radius:2px;}
+.cond-add-btn:hover{background:var(--berry-dim);}
+
+/* add prize form */
+.add-section{background:var(--surface);border:1px solid var(--berry-dim);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+.add-title{font-family:'Bebas Neue',sans-serif;font-size:0.8rem;letter-spacing:0.2em;color:var(--berry);}
+.field-row{display:flex;flex-direction:column;gap:4px;}
+.field-label{font-size:0.48rem;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
+.field-input{background:var(--bg);border:1px solid var(--border);border-radius:2px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.75rem;padding:7px 10px;outline:none;width:100%;}
+.field-input:focus{border-color:var(--berry);}
+.add-btn{font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:0.15em;padding:9px 20px;border:1px solid var(--berry);background:transparent;color:var(--berry);cursor:pointer;border-radius:2px;transition:all 0.15s;}
+.add-btn:hover{background:var(--berry);color:#fff;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="title">Prize Shop</div>
+    <a class="back-btn" href="lever.html">← back</a>
+  </div>
+  <div id="status">loading...</div>
+  <div class="prize-list" id="prizeList"></div>
+
+  <div class="add-section">
+    <div class="add-title">Add New Prize</div>
+    <div class="field-row">
+      <div class="field-label">name</div>
+      <input class="field-input" id="newName" placeholder="e.g. Foot Massage">
+    </div>
+    <div class="field-row">
+      <div class="field-label">short name (for card)</div>
+      <input class="field-input" id="newShort" placeholder="e.g. Massage">
+    </div>
+    <div class="field-row">
+      <div class="field-label">berry cost</div>
+      <input class="field-input" id="newCost" type="number" value="200" min="1">
+    </div>
+    <button class="add-btn" onclick="addPrize()">add prize</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://rthghgzdwqnlzvsoerhz.supabase.co';
+const SUPABASE_KEY='sb_publishable_RvrKhg03c_vSx1wYwpSNFw_oRVuTVCQ';
+
+async function sbFetch(path,opts={}) {
+  const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,{
+    ...opts,
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=representation',...(opts.headers||{})},
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const t=await res.text(); return t?JSON.parse(t):null;
+}
+
+let prizes=[];
+
+async function load() {
+  try {
+    prizes = await sbFetch('prizes?select=*&order=berry_cost.asc') || [];
+    renderPrizes();
+    setStatus('','');
+  } catch(e) { setStatus('err','load failed: '+e.message); }
+}
+
+function setStatus(cls,msg) { const el=document.getElementById('status'); el.className=cls; el.textContent=msg; }
+
+function renderPrizes() {
+  const list=document.getElementById('prizeList');
+  if (!prizes.length) { list.innerHTML='<div style="color:var(--muted);font-size:0.6rem;text-align:center;padding:16px;">no prizes yet — add one below</div>'; return; }
+  list.innerHTML = prizes.map(p => {
+    const conds = p.conditions || {};
+    const condRows = Object.entries(conds).map(([k,v]) => `
+      <div class="cond-row">
+        <div class="cond-key">${k}</div>
+        <div class="cond-val ${v?'true':'false'}">${v?'TRUE':'FALSE'}</div>
+        <button class="cond-toggle" onclick="toggleCond('${p.id}','${k}',${!v})">${v?'→ false':'→ true'}</button>
+        <button class="cond-del" onclick="deleteCond('${p.id}','${k}')">×</button>
+      </div>`).join('');
+
+    return `<div class="prize-item">
+      <div class="prize-item-header">
+        <div>
+          <div class="prize-item-name">${p.name}</div>
+          <div class="prize-item-cost">${p.berry_cost} berries · ${p.short_name||'—'}</div>
+        </div>
+        <div class="prize-item-btns">
+          <button class="item-btn del" onclick="deletePrize('${p.id}')">delete</button>
+        </div>
+      </div>
+      <div class="conditions-wrap">
+        <div class="cond-label">unlock conditions</div>
+        ${condRows || '<div style="font-size:0.5rem;color:var(--muted);padding:4px 0;">none — unlocks when berries sufficient</div>'}
+        <div class="add-cond-row">
+          <input class="cond-input" id="condKey-${p.id}" placeholder="condition name">
+          <button class="cond-add-btn" onclick="addCond('${p.id}')">+ add</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addPrize() {
+  const name=document.getElementById('newName').value.trim();
+  const short=document.getElementById('newShort').value.trim();
+  const cost=parseInt(document.getElementById('newCost').value)||200;
+  if (!name) { setStatus('err','name required'); return; }
+  try {
+    setStatus('','saving...');
+    await sbFetch('prizes',{method:'POST',body:JSON.stringify({name,short_name:short||name,berry_cost:cost,conditions:{},active:true}),headers:{'Prefer':'return=minimal'}});
+    document.getElementById('newName').value='';
+    document.getElementById('newShort').value='';
+    document.getElementById('newCost').value='200';
+    await load();
+    setStatus('ok','prize added ✓'); setTimeout(()=>setStatus('',''),2000);
+  } catch(e) { setStatus('err','save failed: '+e.message); }
+}
+
+async function deletePrize(id) {
+  if (!confirm('Delete this prize?')) return;
+  try {
+    await sbFetch(`prizes?id=eq.${id}`,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
+    await load();
+  } catch(e) { setStatus('err','delete failed'); }
+}
+
+async function addCond(prizeId) {
+  const key=document.getElementById(`condKey-${prizeId}`).value.trim();
+  if (!key) return;
+  const prize=prizes.find(p=>p.id===prizeId); if (!prize) return;
+  const conds={...(prize.conditions||{}), [key]:false};
+  try {
+    await sbFetch(`prizes?id=eq.${prizeId}`,{method:'PATCH',body:JSON.stringify({conditions:conds}),headers:{'Prefer':'return=minimal'}});
+    await load();
+  } catch(e) { setStatus('err','failed: '+e.message); }
+}
+
+async function toggleCond(prizeId,key,newVal) {
+  const prize=prizes.find(p=>p.id===prizeId); if (!prize) return;
+  const conds={...(prize.conditions||{}), [key]:newVal};
+  try {
+    await sbFetch(`prizes?id=eq.${prizeId}`,{method:'PATCH',body:JSON.stringify({conditions:conds}),headers:{'Prefer':'return=minimal'}});
+    await load();
+  } catch(e) { setStatus('err','failed'); }
+}
+
+async function deleteCond(prizeId,key) {
+  const prize=prizes.find(p=>p.id===prizeId); if (!prize) return;
+  const conds={...(prize.conditions||{})};
+  delete conds[key];
+  try {
+    await sbFetch(`prizes?id=eq.${prizeId}`,{method:'PATCH',body:JSON.stringify({conditions:conds}),headers:{'Prefer':'return=minimal'}});
+    await load();
+  } catch(e) { setStatus('err','failed'); }
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>The Lever — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0804;
+  --surface: #141008;
+  --border: #2a1f0a;
+  --amber: #d4861a;
+  --amber-dim: #8a5510;
+  --gold: #f0c040;
+  --gold-bright: #ffe080;
+  --berry: #7040c0;
+  --berry-dim: #3a1f6a;
+  --berry-bright: #a060ff;
+  --berry-glow: rgba(112,64,192,0.15);
+  --text: #c8b090;
+  --muted: #5a4a30;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column; align-items: center;
+}
+body::after {
+  content:''; position:fixed; inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.05) 3px,rgba(0,0,0,0.05) 6px);
+  pointer-events:none; z-index:1000;
+}
+#particles { position:fixed; inset:0; pointer-events:none; z-index:500; }
+.page { width:100%; max-width:420px; padding:16px 16px 48px; display:flex; flex-direction:column; gap:20px; }
+
+/* sync */
+#sync-status { font-size:0.5rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); min-height:14px; text-align:center; transition:color 0.3s; }
+#sync-status.syncing { color:var(--amber); }
+#sync-status.ok { color:#608060; }
+#sync-status.err { color:#c04040; }
+
+/* actor bucks */
+.ab-section { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:10px 14px; display:flex; flex-direction:column; gap:8px; }
+.ab-row { display:flex; align-items:center; justify-content:space-between; }
+.ab-title { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; letter-spacing:0.2em; color:var(--amber); }
+.ab-balance { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:var(--gold); line-height:1; text-shadow:0 0 16px rgba(240,192,64,0.25); }
+.ab-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.ab-btn { font-family:'Bebas Neue',sans-serif; font-size:0.8rem; letter-spacing:0.1em; padding:5px 10px; border-radius:2px; cursor:pointer; border:1px solid; transition:all 0.12s; -webkit-tap-highlight-color:transparent; user-select:none; }
+.ab-earn { border-color:var(--amber-dim); color:var(--amber); background:transparent; }
+.ab-earn:active { background:var(--amber); color:#000; }
+.ab-spend { border-color:#5a2a0a; color:#c06030; background:transparent; }
+.ab-spend:active { background:#5a2a0a; color:#f08040; }
+
+/* berries */
+.berry-section { display:flex; flex-direction:column; align-items:center; gap:16px; }
+.berry-title { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; letter-spacing:0.35em; color:var(--muted); text-transform:uppercase; }
+.berry-balance-wrap { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.berry-label { font-size:0.48rem; color:var(--muted); letter-spacing:0.2em; text-transform:uppercase; }
+#berryBalance { font-family:'Bebas Neue',sans-serif; font-size:clamp(4.5rem,18vw,8rem); line-height:1; color:var(--berry-bright); letter-spacing:0.05em; text-shadow:0 0 40px rgba(112,64,192,0.4); transition:color 0.15s; user-select:none; }
+#berryBalance.flash { color:#c080ff; text-shadow:0 0 60px rgba(192,128,255,0.7); }
+#berryBalance.flash-spend { color:#8040a0; }
+.berry-sub { font-size:0.52rem; color:var(--muted); letter-spacing:0.15em; }
+
+/* main button */
+.berry-main-btn { position:relative; width:clamp(130px,33vw,175px); height:clamp(130px,33vw,175px); border-radius:50%; cursor:pointer; -webkit-tap-highlight-color:transparent; outline:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-family:'Bebas Neue',sans-serif; letter-spacing:0.2em; transition:all 0.1s; user-select:none; border:2px solid var(--berry-dim); background:radial-gradient(ellipse at 40% 35%,#180a30,#0a0810); color:var(--berry); box-shadow:0 0 24px rgba(112,64,192,0.07); }
+.berry-main-btn:hover { border-color:var(--berry); color:var(--berry-bright); }
+.berry-main-btn:active,.berry-main-btn.pressed { transform:scale(0.93); box-shadow:0 0 50px rgba(112,64,192,0.3); border-color:var(--berry-bright); color:#c080ff; }
+.berry-main-btn .btn-icon { font-size:1.8rem; line-height:1; }
+.berry-main-btn .btn-label { font-size:0.85rem; }
+.berry-main-btn.play-mode { border-color:var(--gold); color:var(--gold); background:radial-gradient(ellipse at 40% 35%,#201408,#0a0804); animation:playPulse 2s ease-in-out infinite; }
+@keyframes playPulse { 0%,100%{box-shadow:0 0 24px rgba(240,192,64,0.12)} 50%{box-shadow:0 0 50px rgba(240,192,64,0.35)} }
+.berry-main-btn::after { content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--berry-bright); opacity:0; }
+.berry-main-btn.ring::after { animation:ringPulse 0.6s ease-out forwards; }
+@keyframes ringPulse { 0%{opacity:0.7;transform:scale(1)} 100%{opacity:0;transform:scale(1.3)} }
+
+/* session */
+.berry-session { display:flex; gap:20px; justify-content:center; }
+.sess-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.sess-val { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:var(--berry); line-height:1; }
+.sess-lbl { font-size:0.46rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; }
+
+/* prizes */
+.prizes-section { display:flex; flex-direction:column; gap:8px; }
+.prizes-title { font-family:'Bebas Neue',sans-serif; font-size:0.75rem; letter-spacing:0.25em; color:var(--muted); text-align:center; }
+.prize-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.prize-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:10px; cursor:not-allowed; transition:all 0.2s; display:flex; flex-direction:column; gap:3px; opacity:0.4; user-select:none; }
+.prize-card.reachable { border-color:var(--berry-dim); opacity:0.65; }
+.prize-card.unlocked { border-color:var(--berry); opacity:1; cursor:pointer; animation:prizeGlow 2s ease-in-out infinite; }
+@keyframes prizeGlow { 0%,100%{box-shadow:0 0 10px rgba(112,64,192,0.12)} 50%{box-shadow:0 0 24px rgba(112,64,192,0.38)} }
+.prize-card.unlocked:active { transform:scale(0.97); }
+.prize-name { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; letter-spacing:0.1em; color:var(--text); }
+.prize-cost { font-size:0.48rem; color:var(--muted); letter-spacing:0.1em; }
+.prize-cost.affordable { color:var(--berry-bright); }
+.prize-note { font-size:0.46rem; color:var(--muted); letter-spacing:0.06em; font-style:italic; }
+
+/* controls */
+.controls { display:flex; gap:7px; flex-wrap:wrap; justify-content:center; }
+.ctrl-btn { font-family:'Share Tech Mono',monospace; font-size:0.5rem; letter-spacing:0.1em; text-transform:uppercase; padding:5px 10px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; border-radius:2px; transition:all 0.15s; }
+.ctrl-btn:hover { border-color:var(--muted); color:var(--text); }
+
+/* floating numbers */
+.float-num { position:fixed; font-family:'Bebas Neue',sans-serif; font-size:1.6rem; pointer-events:none; z-index:600; animation:floatUp 1.2s ease-out forwards; user-select:none; }
+.float-num.earn { color:var(--berry-bright); text-shadow:0 0 16px rgba(160,96,255,0.8); }
+.float-num.spend { color:#c06030; }
+@keyframes floatUp { 0%{opacity:1;transform:translateY(0) scale(1)} 30%{opacity:1;transform:translateY(-18px) scale(1.25)} 100%{opacity:0;transform:translateY(-70px) scale(0.8)} }
+
+/* game overlay */
+#gameOverlay { display:none; position:fixed; inset:0; background:var(--bg); z-index:900; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; overflow-y:auto; }
+.game-title { font-family:'Bebas Neue',sans-serif; font-size:0.75rem; letter-spacing:0.35em; color:var(--muted); text-transform:uppercase; }
+#gameInfo { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; color:var(--gold); letter-spacing:0.1em; }
+#gameGrid { display:grid; gap:5px; }
+#gameStatus { font-family:'Bebas Neue',sans-serif; font-size:0.85rem; letter-spacing:0.15em; color:var(--muted); min-height:20px; text-align:center; }
+#gameResult { display:none; flex-direction:column; align-items:center; gap:12px; }
+#gameResultText { font-family:'Bebas Neue',sans-serif; font-size:2rem; letter-spacing:0.15em; text-align:center; }
+@keyframes sqAppear { from{opacity:0;transform:scale(0.3)} to{opacity:1;transform:scale(1)} }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+
+<div class="page">
+  <div id="sync-status">connecting...</div>
+
+  <!-- ACTOR BUCKS -->
+  <div class="ab-section">
+    <div class="ab-row">
+      <div class="ab-title">Actor Bucks</div>
+      <div class="ab-balance" id="abBalance">—</div>
+    </div>
+    <div class="ab-btns">
+      <button class="ab-btn ab-earn" onclick="abEarn(100)">+100</button>
+      <button class="ab-btn ab-spend" onclick="abSpend(1)">−1</button>
+      <button class="ab-btn ab-spend" onclick="abSpend(15)">−15</button>
+      <button class="ab-btn ab-spend" onclick="abSpend(25)">−25</button>
+    </div>
+  </div>
+
+  <!-- BERRIES -->
+  <div class="berry-section">
+    <div class="berry-title">Berries ᛫ ベリー</div>
+    <div class="berry-balance-wrap">
+      <div class="berry-label">balance</div>
+      <div id="berryBalance">—</div>
+      <div class="berry-sub" id="berrySub"></div>
+    </div>
+    <button class="berry-main-btn" id="berryBtn" onclick="handleBerryBtn()">
+      <div class="btn-icon" id="berryBtnIcon">✦</div>
+      <div class="btn-label" id="berryBtnLabel">deposit</div>
+    </button>
+    <div class="berry-session">
+      <div class="sess-item"><div class="sess-val" id="sessDeposited">0</div><div class="sess-lbl">deposited</div></div>
+      <div class="sess-item"><div class="sess-val" id="sessWon">0</div><div class="sess-lbl">won</div></div>
+      <div class="sess-item"><div class="sess-val" id="sessLost">0</div><div class="sess-lbl">lost</div></div>
+    </div>
+  </div>
+
+  <!-- PRIZES -->
+  <div class="prizes-section">
+    <div class="prizes-title">Prize Shop</div>
+    <div class="prize-grid" id="prizeGrid">
+      <div style="color:var(--muted);font-size:0.55rem;grid-column:1/-1;text-align:center;padding:12px;">loading prizes...</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="ctrl-btn" onclick="location.href='lever-prizes.html'">manage prizes</button>
+    <button class="ctrl-btn" onclick="exportBackup()">↓ backup</button>
+  </div>
+</div>
+
+<!-- GAME OVERLAY -->
+<div id="gameOverlay">
+  <div class="game-title">Berry Game</div>
+  <div id="gameInfo"></div>
+  <div id="gameGrid"></div>
+  <div id="gameStatus"></div>
+  <div id="gameResult">
+    <div id="gameResultText"></div>
+    <div id="gameBreakdown" style="font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;"></div>
+    <button onclick="endGame()" style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.2em;padding:10px 28px;border:1px solid var(--berry);color:var(--berry);background:transparent;cursor:pointer;border-radius:2px;margin-top:8px;">continue →</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://rthghgzdwqnlzvsoerhz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RvrKhg03c_vSx1wYwpSNFw_oRVuTVCQ';
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const t = await res.text(); return t ? JSON.parse(t) : null;
+}
+
+async function logTx(table, type, amount, note = null) {
+  await sbFetch(table, { method:'POST', body:JSON.stringify({type,amount,note}), headers:{'Prefer':'return=minimal'} });
+}
+
+async function calcBalance(table) {
+  const rows = await sbFetch(`${table}?select=type,amount`);
+  if (!rows) return 0;
+  return rows.reduce((s, r) => {
+    const earns = ['earn','game_win'];
+    const spends = ['spend','game_start','game_loss'];
+    return s + (earns.includes(r.type) ? r.amount : spends.includes(r.type) ? -r.amount : 0);
+  }, 0);
+}
+
+// STATE
+let abBalance = 0, berryBalance = 0, prizes = [];
+let sessDeposited = 0, sessWon = 0, sessLost = 0;
+let syncing = false;
+
+// PARTICLES
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let particles = [];
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+function spawn(x, y, colors, n=10) {
+  for (let i=0;i<n;i++) {
+    const a = Math.PI*2/n*i + Math.random()*0.5, sp = 2+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,size:1.5+Math.random()*2.5,alpha:1,color:colors[Math.floor(Math.random()*colors.length)]});
+  }
+}
+(function loop() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  particles = particles.filter(p=>p.alpha>0);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.alpha-=0.02;
+    ctx.save();ctx.globalAlpha=p.alpha;ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=4;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.restore();
+  });
+  requestAnimationFrame(loop);
+})();
+
+// UI HELPERS
+function setSync(s,m='') { const el=document.getElementById('sync-status'); el.className=s; el.textContent=m; }
+function showFloat(amt,type,x,y) {
+  const el=document.createElement('div'); el.className='float-num '+type;
+  el.textContent=(type==='spend'?'−':'+')+amt; el.style.left=(x-18)+'px'; el.style.top=(y-18)+'px';
+  document.body.appendChild(el); setTimeout(()=>el.remove(),1200);
+}
+function ringPulse() {
+  const b=document.getElementById('berryBtn'); b.classList.remove('ring'); void b.offsetWidth; b.classList.add('ring');
+  setTimeout(()=>b.classList.remove('ring'),600);
+}
+function flashBerry(type) {
+  const el=document.getElementById('berryBalance');
+  el.classList.add(type==='earn'?'flash':'flash-spend'); setTimeout(()=>el.classList.remove('flash','flash-spend'),350);
+}
+
+function updateBerryBtn() {
+  const btn=document.getElementById('berryBtn');
+  const icon=document.getElementById('berryBtnIcon');
+  const label=document.getElementById('berryBtnLabel');
+  if (berryBalance > 0) { btn.classList.add('play-mode'); icon.textContent='▶'; label.textContent='play'; }
+  else { btn.classList.remove('play-mode'); icon.textContent='✦'; label.textContent='deposit'; }
+}
+
+function render() {
+  document.getElementById('abBalance').textContent = abBalance;
+  document.getElementById('berryBalance').textContent = berryBalance;
+  document.getElementById('berrySub').textContent = berryBalance===0?'no berries yet':berryBalance===1?'1 berry':`${berryBalance} berries`;
+  document.getElementById('sessDeposited').textContent = sessDeposited;
+  document.getElementById('sessWon').textContent = sessWon;
+  document.getElementById('sessLost').textContent = sessLost;
+  updateBerryBtn();
+  renderPrizes();
+}
+
+function renderPrizes() {
+  const grid = document.getElementById('prizeGrid');
+  if (!prizes.length) {
+    grid.innerHTML='<div style="color:var(--muted);font-size:0.55rem;grid-column:1/-1;text-align:center;padding:12px;">no prizes yet</div>'; return;
+  }
+  grid.innerHTML = prizes.map(p => {
+    const canAfford = berryBalance >= p.berry_cost;
+    const condMet = !p.conditions || Object.keys(p.conditions).length===0 || Object.values(p.conditions).every(v=>v===true);
+    const unlocked = canAfford && condMet;
+    const reachable = !canAfford && berryBalance > 0;
+    let cls = 'prize-card' + (unlocked?' unlocked':reachable?' reachable':'');
+    const click = unlocked ? `handleRedeemPrize('${p.id}')` : '';
+    return `<div class="${cls}" onclick="${click}">
+      <div class="prize-name">${p.short_name||p.name}</div>
+      <div class="prize-cost ${canAfford?'affordable':''}">${p.berry_cost} berries</div>
+      ${!condMet?'<div class="prize-note">conditions pending</div>':''}
+      ${unlocked?'<div class="prize-note" style="color:var(--berry-bright)">tap to redeem ✦</div>':''}
+    </div>`;
+  }).join('');
+}
+
+// ACTOR BUCKS
+async function abEarn(amt) {
+  if (syncing) return; syncing=true;
+  abBalance+=amt; render();
+  try { setSync('syncing','saving...'); await logTx('actor_bucks','earn',amt); setSync('ok','saved ✓'); setTimeout(()=>setSync('',''),2000); }
+  catch(e) { abBalance-=amt; render(); setSync('err','sync failed'); }
+  syncing=false;
+}
+async function abSpend(amt) {
+  if (syncing) return;
+  if (abBalance<amt) { setSync('err','not enough bucks'); setTimeout(()=>setSync('',''),2000); return; }
+  syncing=true; abBalance-=amt; render();
+  try { setSync('syncing','saving...'); await logTx('actor_bucks','spend',amt); setSync('ok','saved ✓'); setTimeout(()=>setSync('',''),2000); }
+  catch(e) { abBalance+=amt; render(); setSync('err','sync failed'); }
+  syncing=false;
+}
+
+// BERRIES
+async function depositBerry() {
+  if (syncing) return; syncing=true;
+  berryBalance+=1; sessDeposited+=1; render(); flashBerry('earn'); ringPulse();
+  const btn=document.getElementById('berryBtn'); const rect=btn.getBoundingClientRect();
+  const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+  showFloat(1,'earn',cx,cy); spawn(cx,cy,['#a060ff','#7040c0','#c080ff'],10);
+  try { setSync('syncing','saving...'); await logTx('berries','earn',1); setSync('ok','saved ✓'); setTimeout(()=>setSync('',''),2000); }
+  catch(e) { berryBalance-=1; sessDeposited-=1; render(); setSync('err','sync failed'); }
+  syncing=false;
+}
+
+function handleBerryBtn() {
+  const btn=document.getElementById('berryBtn'); btn.classList.add('pressed'); setTimeout(()=>btn.classList.remove('pressed'),120);
+  if (berryBalance>0) startGame(); else depositBerry();
+}
+
+// PRIZES
+async function handleRedeemPrize(id) {
+  const p=prizes.find(x=>x.id===id); if (!p) return;
+  if (berryBalance<p.berry_cost) return;
+  if (!confirm(`Redeem "${p.name}" for ${p.berry_cost} berries?`)) return;
+  syncing=true; berryBalance-=p.berry_cost; render();
+  try {
+    setSync('syncing','redeeming...');
+    await sbFetch('prize_redemptions',{method:'POST',body:JSON.stringify({prize_id:p.id,berry_cost:p.berry_cost,note:p.name}),headers:{'Prefer':'return=minimal'}});
+    await logTx('berries','spend',p.berry_cost,`redeemed: ${p.name}`);
+    setSync('ok','redeemed! enjoy ✓'); setTimeout(()=>setSync('',''),4000);
+  } catch(e) { berryBalance+=p.berry_cost; render(); setSync('err','redemption failed'); }
+  syncing=false;
+}
+
+// GAME
+let gameChips=0, gameSquares=[], gameRevealed=0;
+
+function gridDims(n) {
+  if (n<=9)  return {cols:3,count:Math.min(n,9)};
+  if (n<=25) return {cols:5,count:Math.min(n,25)};
+  return {cols:6,count:36};
+}
+
+function startGame() {
+  gameChips = Math.min(berryBalance,36);
+  gameSquares = []; gameRevealed = 0;
+
+  const ov = document.getElementById('gameOverlay');
+  ov.style.display='flex';
+  document.getElementById('gameResult').style.display='none';
+  document.getElementById('gameStatus').textContent='tap all the squares';
+  document.getElementById('gameInfo').textContent=`${gameChips} chips · 50% each`;
+
+  const {cols,count} = gridDims(gameChips);
+  const grid = document.getElementById('gameGrid');
+  grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  grid.innerHTML='';
+
+  const sqSize = Math.min(50,Math.floor((Math.min(window.innerWidth-48,340))/cols)-5);
+
+  for (let i=0;i<count;i++) {
+    const won = Math.random()<0.5;
+    const el = document.createElement('div');
+    el.style.cssText=`width:${sqSize}px;height:${sqSize}px;border-radius:4px;background:var(--berry);border:1px solid var(--berry-bright);box-shadow:0 0 6px rgba(112,64,192,0.4);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1rem;transition:all 0.12s;-webkit-tap-highlight-color:transparent;animation:sqAppear 0.25s ease-out ${i*25}ms both;`;
+    const idx=i;
+    el.addEventListener('click',()=>revealSq(idx));
+    el.addEventListener('touchend',e=>{e.preventDefault();revealSq(idx);});
+    grid.appendChild(el);
+    gameSquares.push({won,revealed:false,el});
+  }
+}
+
+function revealSq(idx) {
+  const sq=gameSquares[idx]; if (sq.revealed) return;
+  sq.revealed=true; gameRevealed++;
+  if (sq.won) {
+    sq.el.style.background='var(--gold)'; sq.el.style.borderColor='var(--gold-bright)';
+    sq.el.style.boxShadow='0 0 10px rgba(240,192,64,0.6)'; sq.el.style.color='#000'; sq.el.textContent='+1';
+  } else {
+    sq.el.style.background='var(--surface)'; sq.el.style.borderColor='var(--border)';
+    sq.el.style.boxShadow='none'; sq.el.style.color='var(--muted)'; sq.el.textContent='×';
+  }
+  sq.el.style.cursor='default';
+  const rem = gameSquares.length-gameRevealed;
+  document.getElementById('gameStatus').textContent = rem>0?`${rem} remaining`:'all cleared!';
+  if (gameRevealed===gameSquares.length) setTimeout(finishGame,400);
+}
+
+async function finishGame() {
+  const won = gameSquares.filter(s=>s.won).length;
+  const chips = gameSquares.length;
+  const net = won - chips; // won - chips spent
+
+  // Update balance: remove chips, add winnings
+  berryBalance -= chips;
+  berryBalance += won;
+
+  if (net>0) sessWon+=net; else if (net<0) sessLost+=Math.abs(net);
+
+  // Log
+  try {
+    await logTx('berries','game_start',chips,`game: ${chips} chips`);
+    if (won>0) await logTx('berries','game_win',won,`game: won ${won}`);
+  } catch(e) { console.error('game log:',e); }
+
+  render();
+
+  // Show result
+  const res=document.getElementById('gameResult');
+  const txt=document.getElementById('gameResultText');
+  const brk=document.getElementById('gameBreakdown');
+  res.style.display='flex';
+  if (net>0) { txt.style.color='var(--gold-bright)'; txt.textContent=`+${net} berries!`; }
+  else if (net===0) { txt.style.color='var(--muted)'; txt.textContent='break even'; }
+  else { txt.style.color='#c06030'; txt.textContent=`${net} berries`; }
+  brk.textContent=`won ${won} / ${chips} squares · balance: ${berryBalance}`;
+  document.getElementById('gameStatus').textContent='';
+}
+
+function endGame() {
+  document.getElementById('gameOverlay').style.display='none';
+  document.getElementById('gameGrid').innerHTML='';
+  render();
+}
+
+// EXPORT
+async function exportBackup() {
+  try {
+    const [ab,b] = await Promise.all([sbFetch('actor_bucks?select=*&order=created_at.desc'),sbFetch('berries?select=*&order=created_at.desc')]);
+    const data={exported:new Date().toISOString(),abBalance,berryBalance,actor_bucks:ab,berries:b};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`lever-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  } catch(e) { alert('Export failed: '+e.message); }
+}
+
+// INIT
+async function init() {
+  setSync('syncing','loading...');
+  try {
+    const [ab,berry,prizeList] = await Promise.all([
+      calcBalance('actor_bucks'),
+      calcBalance('berries'),
+      sbFetch('prizes?select=*&active=eq.true&order=berry_cost.asc'),
+    ]);
+    abBalance=ab; berryBalance=berry; prizes=prizeList||[];
+    render(); setSync('ok','connected ✓'); setTimeout(()=>setSync('',''),2000);
+  } catch(e) { setSync('err','connection failed'); console.error(e); render(); }
+}
+
+init();
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.0</div>
+</body>
+</html>
