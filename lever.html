@@ -172,8 +172,7 @@ body::after {
     </div>
 
     <div class="berry-session">
-      <div class="sess-item"><div class="sess-val" id="sessWon">0</div><div class="sess-lbl">won</div></div>
-      <div class="sess-item"><div class="sess-val" id="sessLost">0</div><div class="sess-lbl">lost</div></div>
+      <div class="sess-item"><div class="sess-val" id="sessWon">0</div><div class="sess-lbl">won today</div></div>
     </div>
   </div>
 
@@ -240,7 +239,7 @@ async function calcBalance(table) {
 
 // STATE
 let abBalance = 0, berryBalance = 0, pendingBalance = 0, prizes = [];
-let sessWon = 0, sessLost = 0;
+let sessWon = 0;
 let syncing = false;
 
 // PARTICLES
@@ -299,7 +298,6 @@ function render() {
     pendingBalance === 1 ? '1 berry ready to play' :
     `${pendingBalance} berries ready to play`;
   document.getElementById('sessWon').textContent = sessWon;
-  document.getElementById('sessLost').textContent = sessLost;
   updateBerryBtn();
   renderPrizes();
 }
@@ -432,15 +430,12 @@ function revealSq(idx) {
 async function finishGame() {
   const won = gameSquares.filter(s=>s.won).length;
   const chips = gameSquares.length;
-  const net = won - chips;
 
-  if (net > 0) sessWon += net;
-  else if (net < 0) sessLost += Math.abs(net);
+  if (won > 0) sessWon += won;
 
-  // Log to Supabase — chips used and winnings
+  // Log to Supabase — only log winnings, no deduction for blank squares
   try {
-    if (chips > 0) await logTx('berries','game_start', chips, `game: used ${chips} chips`);
-    if (won > 0)   await logTx('berries','game_win',   won,   `game: won ${won}`);
+    if (won > 0) await logTx('berries','game_win', won, `game: won ${won} of ${chips} squares`);
   } catch(e) { console.error('game log:', e); }
 
   // Refresh true account balance from Supabase
@@ -453,9 +448,8 @@ async function finishGame() {
   const txt = document.getElementById('gameResultText');
   const brk = document.getElementById('gameBreakdown');
   res.style.display='flex';
-  if (net > 0)      { txt.style.color='var(--gold-bright)'; txt.textContent=`+${net} berries!`; }
-  else if (net ===0) { txt.style.color='var(--muted)';       txt.textContent='break even'; }
-  else               { txt.style.color='#c06030';             txt.textContent=`${net} berries`; }
+  if (won > 0)  { txt.style.color='var(--gold-bright)'; txt.textContent=`+${won} berries!`; }
+  else          { txt.style.color='var(--muted)';        txt.textContent='no berries this time'; }
   brk.textContent = `won ${won} of ${chips} squares · account: ${berryBalance}`;
   document.getElementById('gameStatus').textContent='';
 }
@@ -497,6 +491,6 @@ async function init() {
 
 init();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.3</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.4</div>
 </body>
 </html>
