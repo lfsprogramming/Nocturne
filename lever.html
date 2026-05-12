@@ -101,6 +101,12 @@ body::after {
 .ctrl-btn { font-family:'Share Tech Mono',monospace; font-size:0.5rem; letter-spacing:0.1em; text-transform:uppercase; padding:5px 10px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; border-radius:2px; transition:all 0.15s; }
 .ctrl-btn:hover { border-color:var(--muted); color:var(--text); }
 
+/* play button - separate, appears when balance > 0 */
+.play-btn { display:none; font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:0.2em; padding:10px 32px; border:1px solid var(--gold); background:transparent; color:var(--gold); cursor:pointer; border-radius:2px; transition:all 0.15s; -webkit-tap-highlight-color:transparent; animation:playPulse 2s ease-in-out infinite; }
+@keyframes playPulse { 0%,100%{box-shadow:0 0 10px rgba(240,192,64,0.1)} 50%{box-shadow:0 0 28px rgba(240,192,64,0.35)} }
+.play-btn.visible { display:block; }
+.play-btn:active { background:var(--gold); color:#000; }
+
 /* floating numbers */
 .float-num { position:fixed; font-family:'Bebas Neue',sans-serif; font-size:1.6rem; pointer-events:none; z-index:600; animation:floatUp 1.2s ease-out forwards; user-select:none; }
 .float-num.earn { color:var(--berry-bright); text-shadow:0 0 16px rgba(160,96,255,0.8); }
@@ -147,9 +153,10 @@ body::after {
       <div class="berry-sub" id="berrySub"></div>
     </div>
     <button class="berry-main-btn" id="berryBtn" onclick="handleBerryBtn()">
-      <div class="btn-icon" id="berryBtnIcon">✦</div>
-      <div class="btn-label" id="berryBtnLabel">deposit</div>
+      <div class="btn-icon">✦</div>
+      <div class="btn-label">deposit</div>
     </button>
+    <button class="play-btn" id="playBtn" onclick="startGame()">▶ play</button>
     <div class="berry-session">
       <div class="sess-item"><div class="sess-val" id="sessDeposited">0</div><div class="sess-lbl">deposited</div></div>
       <div class="sess-item"><div class="sess-val" id="sessWon">0</div><div class="sess-lbl">won</div></div>
@@ -263,11 +270,11 @@ function flashBerry(type) {
 }
 
 function updateBerryBtn() {
-  const btn=document.getElementById('berryBtn');
-  const icon=document.getElementById('berryBtnIcon');
-  const label=document.getElementById('berryBtnLabel');
-  if (berryBalance > 0) { btn.classList.add('play-mode'); icon.textContent='▶'; label.textContent='play'; }
-  else { btn.classList.remove('play-mode'); icon.textContent='✦'; label.textContent='deposit'; }
+  const playBtn = document.getElementById('playBtn');
+  if (playBtn) {
+    if (berryBalance > 0) playBtn.classList.add('visible');
+    else playBtn.classList.remove('visible');
+  }
 }
 
 function render() {
@@ -332,8 +339,9 @@ async function depositBerry() {
 }
 
 function handleBerryBtn() {
-  const btn=document.getElementById('berryBtn'); btn.classList.add('pressed'); setTimeout(()=>btn.classList.remove('pressed'),120);
-  if (berryBalance>0) startGame(); else depositBerry();
+  const btn=document.getElementById('berryBtn');
+  btn.classList.add('pressed'); setTimeout(()=>btn.classList.remove('pressed'),120);
+  depositBerry();
 }
 
 // PRIZES
@@ -469,6 +477,6 @@ async function init() {
 
 init();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.1</div>
 </body>
 </html>
