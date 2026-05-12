@@ -101,7 +101,10 @@ body::after {
 .ctrl-btn { font-family:'Share Tech Mono',monospace; font-size:0.5rem; letter-spacing:0.1em; text-transform:uppercase; padding:5px 10px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; border-radius:2px; transition:all 0.15s; }
 .ctrl-btn:hover { border-color:var(--muted); color:var(--text); }
 
-/* play button - separate, appears when balance > 0 */
+/* account balance row - smaller, read only */
+.account-row { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:8px 14px; }
+.account-label { font-size:0.5rem; color:var(--muted); letter-spacing:0.15em; text-transform:uppercase; }
+.account-balance { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; color:var(--berry-bright); line-height:1; flex:1; text-align:center; text-shadow:0 0 16px rgba(112,64,192,0.25); }
 .play-btn { display:none; font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:0.2em; padding:10px 32px; border:1px solid var(--gold); background:transparent; color:var(--gold); cursor:pointer; border-radius:2px; transition:all 0.15s; -webkit-tap-highlight-color:transparent; animation:playPulse 2s ease-in-out infinite; }
 @keyframes playPulse { 0%,100%{box-shadow:0 0 10px rgba(240,192,64,0.1)} 50%{box-shadow:0 0 28px rgba(240,192,64,0.35)} }
 .play-btn.visible { display:block; }
@@ -147,18 +150,28 @@ body::after {
   <!-- BERRIES -->
   <div class="berry-section">
     <div class="berry-title">Berries ᛫ ベリー</div>
+
+    <!-- PENDING — the big number, not yet in account -->
     <div class="berry-balance-wrap">
-      <div class="berry-label">balance</div>
-      <div id="berryBalance">—</div>
-      <div class="berry-sub" id="berrySub"></div>
+      <div class="berry-label">pending · tap to earn</div>
+      <div id="pendingBalance">0</div>
+      <div class="berry-sub" id="pendingSub">press deposit to add</div>
     </div>
+
     <button class="berry-main-btn" id="berryBtn" onclick="handleBerryBtn()">
       <div class="btn-icon">✦</div>
       <div class="btn-label">deposit</div>
     </button>
     <button class="play-btn" id="playBtn" onclick="startGame()">▶ play</button>
+
+    <!-- ACCOUNT — smaller, read only -->
+    <div class="account-row">
+      <div class="account-label">account</div>
+      <div class="account-balance" id="berryBalance">—</div>
+      <div class="account-label">berries</div>
+    </div>
+
     <div class="berry-session">
-      <div class="sess-item"><div class="sess-val" id="sessDeposited">0</div><div class="sess-lbl">deposited</div></div>
       <div class="sess-item"><div class="sess-val" id="sessWon">0</div><div class="sess-lbl">won</div></div>
       <div class="sess-item"><div class="sess-val" id="sessLost">0</div><div class="sess-lbl">lost</div></div>
     </div>
@@ -226,8 +239,8 @@ async function calcBalance(table) {
 }
 
 // STATE
-let abBalance = 0, berryBalance = 0, prizes = [];
-let sessDeposited = 0, sessWon = 0, sessLost = 0;
+let abBalance = 0, berryBalance = 0, pendingBalance = 0, prizes = [];
+let sessWon = 0, sessLost = 0;
 let syncing = false;
 
 // PARTICLES
@@ -272,7 +285,7 @@ function flashBerry(type) {
 function updateBerryBtn() {
   const playBtn = document.getElementById('playBtn');
   if (playBtn) {
-    if (berryBalance > 0) playBtn.classList.add('visible');
+    if (pendingBalance > 0) playBtn.classList.add('visible');
     else playBtn.classList.remove('visible');
   }
 }
@@ -280,8 +293,11 @@ function updateBerryBtn() {
 function render() {
   document.getElementById('abBalance').textContent = abBalance;
   document.getElementById('berryBalance').textContent = berryBalance;
-  document.getElementById('berrySub').textContent = berryBalance===0?'no berries yet':berryBalance===1?'1 berry':`${berryBalance} berries`;
-  document.getElementById('sessDeposited').textContent = sessDeposited;
+  document.getElementById('pendingBalance').textContent = pendingBalance;
+  document.getElementById('pendingSub').textContent =
+    pendingBalance === 0 ? 'press deposit to add' :
+    pendingBalance === 1 ? '1 berry ready to play' :
+    `${pendingBalance} berries ready to play`;
   document.getElementById('sessWon').textContent = sessWon;
   document.getElementById('sessLost').textContent = sessLost;
   updateBerryBtn();
@@ -327,15 +343,14 @@ async function abSpend(amt) {
 }
 
 // BERRIES
-async function depositBerry() {
-  if (syncing) return; syncing=true;
-  berryBalance+=1; sessDeposited+=1; render(); flashBerry('earn'); ringPulse();
-  const btn=document.getElementById('berryBtn'); const rect=btn.getBoundingClientRect();
-  const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
-  showFloat(1,'earn',cx,cy); spawn(cx,cy,['#a060ff','#7040c0','#c080ff'],10);
-  try { setSync('syncing','saving...'); await logTx('berries','earn',1); setSync('ok','saved ✓'); setTimeout(()=>setSync('',''),2000); }
-  catch(e) { berryBalance-=1; sessDeposited-=1; render(); setSync('err','sync failed'); }
-  syncing=false;
+function depositBerry() {
+  // Pending only — nothing goes to Supabase until after the game
+  pendingBalance += 1;
+  render(); flashBerry('earn'); ringPulse();
+  const btn = document.getElementById('berryBtn');
+  const rect = btn.getBoundingClientRect();
+  const cx = rect.left+rect.width/2, cy = rect.top+rect.height/2;
+  showFloat(1,'earn',cx,cy); spawn(cx,cy,['#a060ff','#7040c0','#c080ff'],8);
 }
 
 function handleBerryBtn() {
@@ -369,7 +384,8 @@ function gridDims(n) {
 }
 
 function startGame() {
-  gameChips = Math.min(berryBalance,36);
+  gameChips = Math.min(pendingBalance, 36);
+  pendingBalance = 0; // pending consumed by game
   gameSquares = []; gameRevealed = 0;
 
   const ov = document.getElementById('gameOverlay');
@@ -416,31 +432,31 @@ function revealSq(idx) {
 async function finishGame() {
   const won = gameSquares.filter(s=>s.won).length;
   const chips = gameSquares.length;
-  const net = won - chips; // won - chips spent
+  const net = won - chips;
 
-  // Update balance: remove chips, add winnings
-  berryBalance -= chips;
-  berryBalance += won;
+  if (net > 0) sessWon += net;
+  else if (net < 0) sessLost += Math.abs(net);
 
-  if (net>0) sessWon+=net; else if (net<0) sessLost+=Math.abs(net);
-
-  // Log
+  // Log to Supabase — chips used and winnings
   try {
-    await logTx('berries','game_start',chips,`game: ${chips} chips`);
-    if (won>0) await logTx('berries','game_win',won,`game: won ${won}`);
-  } catch(e) { console.error('game log:',e); }
+    if (chips > 0) await logTx('berries','game_start', chips, `game: used ${chips} chips`);
+    if (won > 0)   await logTx('berries','game_win',   won,   `game: won ${won}`);
+  } catch(e) { console.error('game log:', e); }
+
+  // Refresh true account balance from Supabase
+  try { berryBalance = await calcBalance('berries'); } catch(e) { berryBalance += won; }
 
   render();
 
   // Show result
-  const res=document.getElementById('gameResult');
-  const txt=document.getElementById('gameResultText');
-  const brk=document.getElementById('gameBreakdown');
+  const res = document.getElementById('gameResult');
+  const txt = document.getElementById('gameResultText');
+  const brk = document.getElementById('gameBreakdown');
   res.style.display='flex';
-  if (net>0) { txt.style.color='var(--gold-bright)'; txt.textContent=`+${net} berries!`; }
-  else if (net===0) { txt.style.color='var(--muted)'; txt.textContent='break even'; }
-  else { txt.style.color='#c06030'; txt.textContent=`${net} berries`; }
-  brk.textContent=`won ${won} / ${chips} squares · balance: ${berryBalance}`;
+  if (net > 0)      { txt.style.color='var(--gold-bright)'; txt.textContent=`+${net} berries!`; }
+  else if (net ===0) { txt.style.color='var(--muted)';       txt.textContent='break even'; }
+  else               { txt.style.color='#c06030';             txt.textContent=`${net} berries`; }
+  brk.textContent = `won ${won} of ${chips} squares · account: ${berryBalance}`;
   document.getElementById('gameStatus').textContent='';
 }
 
@@ -481,6 +497,6 @@ async function init() {
 
 init();
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.2</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.3</div>
 </body>
 </html>
