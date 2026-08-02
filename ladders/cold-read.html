@@ -75,22 +75,6 @@ body::after { content: ''; position: fixed; inset: 0; background: repeating-line
 .back-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.52rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; border-radius: 1px; transition: all 0.15s; }
 .back-btn:hover { border-color: var(--muted); color: var(--text); }
 
-/* QUESTION OVERLAY */
-#questionOverlay { display: none; position: fixed; inset: 0; background: rgba(6,6,10,0.96); z-index: 800; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 32px 20px; }
-#questionOverlay.visible { display: flex; }
-.q-label { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
-#questionText { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.1rem, 3.5vw, 1.6rem); color: var(--text); text-align: center; max-width: 520px; line-height: 1.7; font-style: italic; }
-#questionOptions { display: flex; flex-direction: column; gap: 8px; width: min(480px, 90vw); }
-.q-option { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; letter-spacing: 0.06em; padding: 10px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; border-radius: 2px; transition: all 0.12s; text-align: left; }
-.q-option:hover { border-color: var(--accent); color: var(--accent); }
-.q-option.correct { border-color: var(--green); color: var(--green); background: rgba(109,186,138,0.08); }
-.q-option.wrong { border-color: var(--danger); color: var(--danger); background: rgba(184,80,80,0.08); }
-.q-option:disabled { cursor: default; }
-#qFeedback { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); min-height: 18px; text-align: center; }
-#qContinue { display: none; font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 20px; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); cursor: pointer; border-radius: 2px; }
-#qContinue:hover { background: var(--accent2); color: #000; }
-#qScore { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.1em; }
-
 /* DONE */
 #done { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 18px; text-align: center; padding: 40px 20px; }
 .done-title { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: clamp(3rem, 10vw, 5rem); letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; text-shadow: 0 0 40px rgba(212,175,106,0.3); animation: donepop 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
@@ -195,22 +179,8 @@ body::after { content: ''; position: fixed; inset: 0; background: repeating-line
       </div>
     </div>
 
-    <!-- Comprehension Questions -->
-    <div class="setting-row">
-      <label>questions (AI)</label>
-      <div class="toggle-row">
-        <button class="toggle-btn active" id="questionsOff" onclick="setToggle('questions',false)">off</button>
-        <button class="toggle-btn" id="questionsOn" onclick="setToggle('questions',true)">on</button>
-      </div>
-    </div>
-    <div class="sub-row" id="questionsIntervalRow">
-      <label style="font-size:0.48rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;min-width:130px;">every</label>
-      <input type="range" id="slQInterval" min="1" max="5" step="1" value="2" style="flex:1;accent-color:var(--accent)">
-      <span class="setting-val" id="outQInterval">2 min</span>
-    </div>
   </div>
 
-  <div id="aiStatus"></div>
   <button class="start-btn" id="startBtn" disabled onclick="startReading()">begin</button>
 </div>
 
@@ -248,23 +218,12 @@ body::after { content: ''; position: fixed; inset: 0; background: repeating-line
   </div>
 </div>
 
-<!-- QUESTION OVERLAY -->
-<div id="questionOverlay">
-  <div class="q-label">comprehension check</div>
-  <div id="questionText"></div>
-  <div id="questionOptions"></div>
-  <div id="qFeedback"></div>
-  <div id="qScore"></div>
-  <button id="qContinue" onclick="resumeAfterQuestion()">continue reading →</button>
-</div>
-
 <!-- DONE -->
 <div id="done">
   <div class="done-title">complete</div>
   <div class="done-stat">read <span id="doneWords">—</span> words</div>
   <div class="done-stat">average speed: <span id="doneWpm">—</span> wpm</div>
   <div class="done-stat">time: <span id="doneTime">—</span></div>
-  <div class="done-stat">comprehension: <span id="doneScore">—</span></div>
   <div class="done-btns">
     <button class="done-btn primary" onclick="restartSame()">read again</button>
     <button class="done-btn" onclick="goSetup()">new text</button>
@@ -277,17 +236,15 @@ body::after { content: ''; position: fixed; inset: 0; background: repeating-line
 // ══════════════════════════════════════════════════
 const opts = {
   ramp: false,
-  metro: false,       // false | 'click' | 'tone'
+  metro: false,
   color: false,
   blur: false,
   scramble: false,
-  questions: false,
 };
 
 let metroVolume = 0.3;
 let colorIntensity = 5;
 let blurAmount = 3;
-let questionInterval = 2; // minutes
 
 function setToggle(key, val) {
   opts[key] = val;
@@ -313,11 +270,6 @@ function setToggle(key, val) {
   } else if (key === 'scramble') {
     document.getElementById('scrambleOn').classList.toggle('active', val);
     document.getElementById('scrambleOff').classList.toggle('active', !val);
-  } else if (key === 'questions') {
-    document.getElementById('questionsOn').classList.toggle('active', val);
-    document.getElementById('questionsOff').classList.toggle('active', !val);
-    document.getElementById('questionsIntervalRow').classList.toggle('visible', val);
-    if (val && storedText) generateQuestions(storedText);
   }
 }
 
@@ -353,14 +305,6 @@ let wpmHistory = [];
 let rampTimer = null;
 let metroTimer = null;
 let storedText = '';
-
-// Questions state
-let questions = [];
-let qIndex = 0;
-let qCorrect = 0;
-let qTotal = 0;
-let lastQuestionTime = 0;
-let questionPending = false;
 
 // ══════════════════════════════════════════════════
 // AUDIO (Web Audio API — no external files needed)
@@ -462,109 +406,6 @@ function scrambleChunk(chunk) {
 }
 
 // ══════════════════════════════════════════════════
-// AI COMPREHENSION QUESTIONS
-// ══════════════════════════════════════════════════
-async function generateQuestions(text) {
-  if (!opts.questions) return;
-  document.getElementById('aiStatus').textContent = 'generating questions...';
-  document.getElementById('aiStatus').className = 'loading';
-
-  // Truncate text to avoid token limits
-  const excerpt = text.slice(0, 3000);
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `Generate 6 multiple-choice comprehension questions for the following text. Return ONLY valid JSON, no markdown, no explanation. Format:
-[{"q":"question text","options":["A","B","C","D"],"answer":0}]
-where answer is the 0-based index of the correct option.
-
-Text:
-${excerpt}`
-        }]
-      })
-    });
-
-    const data = await response.json();
-    const raw = data.content?.[0]?.text || '[]';
-    // Strip any markdown fences just in case
-    const clean = raw.replace(/```json|```/g, '').trim();
-    questions = JSON.parse(clean);
-    qIndex = 0; qCorrect = 0; qTotal = 0;
-    document.getElementById('aiStatus').textContent = `${questions.length} questions ready`;
-    document.getElementById('aiStatus').className = 'ok';
-    setTimeout(() => { document.getElementById('aiStatus').textContent = ''; document.getElementById('aiStatus').className = ''; }, 3000);
-  } catch(e) {
-    console.error('Question generation failed:', e);
-    document.getElementById('aiStatus').textContent = 'question generation failed — continuing without';
-    document.getElementById('aiStatus').className = 'err';
-    opts.questions = false;
-  }
-}
-
-function checkForQuestion() {
-  if (!opts.questions || !playing || questions.length === 0) return;
-  if (questionPending) return;
-  const elapsed = (Date.now() - lastQuestionTime) / 1000 / 60; // minutes
-  if (elapsed >= questionInterval && qIndex < questions.length) {
-    questionPending = true;
-    pause();
-    showQuestion();
-  }
-}
-
-function showQuestion() {
-  const q = questions[qIndex];
-  if (!q) { resumeAfterQuestion(); return; }
-
-  document.getElementById('questionText').textContent = q.q;
-  document.getElementById('qFeedback').textContent = '';
-  document.getElementById('qContinue').style.display = 'none';
-  document.getElementById('qScore').textContent =
-    qTotal > 0 ? `${qCorrect}/${qTotal} correct so far` : '';
-
-  const optsEl = document.getElementById('questionOptions');
-  optsEl.innerHTML = q.options.map((opt, i) =>
-    `<button class="q-option" onclick="answerQuestion(${i})">${opt}</button>`
-  ).join('');
-
-  document.getElementById('questionOverlay').classList.add('visible');
-}
-
-function answerQuestion(chosen) {
-  const q = questions[qIndex];
-  qTotal++;
-  const correct = chosen === q.answer;
-  if (correct) qCorrect++;
-
-  // Disable all options
-  document.querySelectorAll('.q-option').forEach((btn, i) => {
-    btn.disabled = true;
-    if (i === q.answer) btn.classList.add('correct');
-    else if (i === chosen && !correct) btn.classList.add('wrong');
-  });
-
-  document.getElementById('qFeedback').textContent = correct ? 'correct ✓' : 'incorrect';
-  document.getElementById('qFeedback').style.color = correct ? 'var(--green)' : 'var(--danger)';
-  document.getElementById('qScore').textContent = `${qCorrect}/${qTotal} correct`;
-  document.getElementById('qContinue').style.display = 'block';
-  qIndex++;
-}
-
-function resumeAfterQuestion() {
-  document.getElementById('questionOverlay').classList.remove('visible');
-  questionPending = false;
-  lastQuestionTime = Date.now();
-  play();
-}
-
-// ══════════════════════════════════════════════════
 // SETUP LISTENERS
 // ══════════════════════════════════════════════════
 let storedTextPrev = '';
@@ -626,8 +467,6 @@ async function startReading() {
   playing = false;
   sessionStart = null;
   wpmHistory = [];
-  lastQuestionTime = Date.now();
-  questionPending = false;
   colorIdx = 0;
 
   document.getElementById('setup').style.display = 'none';
@@ -637,11 +476,6 @@ async function startReading() {
   updateHud();
   showChunk(currentChunk);
   document.getElementById('statusMsg').textContent = 'press space to begin';
-
-  // Generate questions if enabled and not yet generated
-  if (opts.questions && questions.length === 0) {
-    await generateQuestions(storedText);
-  }
 }
 
 function showChunk(idx) {
@@ -715,7 +549,6 @@ function scheduleNext() {
     if (currentChunk >= chunks.length) { finishReading(); return; }
     showChunk(currentChunk);
     wpmHistory.push(wpm);
-    checkForQuestion();
     scheduleNext();
   }, ms);
 }
@@ -734,7 +567,6 @@ function exitReader() {
   pause();
   clearInterval(rampTimer);
   clearInterval(metroTimer);
-  document.getElementById('questionOverlay').classList.remove('visible');
   goSetup();
 }
 
@@ -742,7 +574,6 @@ function goSetup() {
   document.getElementById('reader').style.display = 'none';
   document.getElementById('done').style.display = 'none';
   document.getElementById('setup').style.display = 'flex';
-  questions = []; // reset so new text generates fresh questions
 }
 
 function finishReading() {
@@ -762,13 +593,10 @@ function finishReading() {
   document.getElementById('doneWords').textContent = totalWords;
   document.getElementById('doneWpm').textContent = avgWpm;
   document.getElementById('doneTime').textContent = formatTime(elapsed);
-  document.getElementById('doneScore').textContent =
-    qTotal > 0 ? `${qCorrect}/${qTotal} correct` : 'n/a';
 }
 
 function restartSame() {
   document.getElementById('done').style.display = 'none';
-  qIndex = 0; qCorrect = 0; qTotal = 0; // reset score but keep questions
   startReading();
 }
 
@@ -778,7 +606,6 @@ function restartSame() {
 document.addEventListener('keydown', e => {
   if (document.getElementById('reader').style.display !== 'flex') return;
   if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
-  if (document.getElementById('questionOverlay').classList.contains('visible')) return;
 
   switch(e.key) {
     case ' ':
@@ -806,6 +633,6 @@ document.addEventListener('keydown', e => {
   }
 });
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.0</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.1</div>
 </body>
 </html>
