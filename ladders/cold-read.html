@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cold Read — Nocturne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Cormorant+Garamond:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06060a;
+  --surface: #0c0c12;
+  --border: #1c1c28;
+  --accent: #c8a96e;
+  --accent2: #7c9eb2;
+  --gold: #d4af6a;
+  --green: #6dba8a;
+  --warn: #c4884a;
+  --danger: #b85050;
+  --text: #d8d4cc;
+  --muted: #4a4858;
+  --dim: #2a2836;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 6px);
+  pointer-events: none; z-index: 1000;
+}
+
+/* ── SETUP ── */
+#setup {
+  width: 100%; max-width: 560px;
+  padding: 32px 20px 48px;
+  display: flex; flex-direction: column; gap: 24px;
+  align-items: center;
+}
+
+.logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300; font-size: clamp(2.5rem, 8vw, 4rem);
+  letter-spacing: 0.25em; color: var(--accent);
+  text-shadow: 0 0 40px rgba(200,169,110,0.25);
+  text-transform: uppercase;
+  animation: logopulse 4s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { text-shadow: 0 0 30px rgba(200,169,110,0.15); }
+  50%      { text-shadow: 0 0 60px rgba(200,169,110,0.4); }
+}
+.tagline { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -16px; }
+
+/* textarea */
+.paste-wrap { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.paste-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+#textInput {
+  width: 100%; height: 160px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 2px; color: var(--text);
+  font-family: 'Cormorant Garamond', serif; font-size: 1rem; line-height: 1.6;
+  padding: 12px 14px; outline: none; resize: vertical;
+  transition: border-color 0.15s;
+}
+#textInput:focus { border-color: var(--accent); }
+#textInput::placeholder { color: var(--muted); font-style: italic; }
+
+.word-count { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-align: right; }
+
+/* settings */
+.settings-grid { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.section-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 2px; }
+
+.setting-row { display: flex; align-items: center; gap: 12px; }
+.setting-row label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 140px; }
+.setting-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.setting-val { font-size: 0.8rem; color: var(--accent); min-width: 60px; text-align: right; font-family: 'Share Tech Mono', monospace; }
+
+/* ramp toggle */
+.toggle-row { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+.toggle-btn {
+  flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 8px 0; border: none; background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.toggle-btn.active { background: var(--accent); color: #000; }
+
+.start-btn {
+  font-family: 'Cormorant Garamond', serif; font-size: 1.2rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  padding: 12px 48px; border: 1px solid var(--accent); background: transparent;
+  color: var(--accent); cursor: pointer; border-radius: 1px; transition: all 0.25s;
+  position: relative; overflow: hidden;
+}
+.start-btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); transition: transform 0.25s; z-index: -1; }
+.start-btn:hover { color: #000; }
+.start-btn:hover::before { transform: translateX(0); }
+.start-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.start-btn:disabled:hover { color: var(--accent); }
+.start-btn:disabled:hover::before { transform: translateX(-100%); }
+
+/* ── READER ── */
+#reader {
+  display: none;
+  width: 100%; max-width: 700px;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* hud */
+#hud {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; line-height: 1; color: var(--accent); }
+.hud-stat .val.green { color: var(--green); }
+.hud-stat .lbl { font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+/* progress bar */
+#progress-bg { width: 100%; height: 2px; background: var(--border); flex-shrink: 0; }
+#progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s linear; }
+
+/* display area */
+#display-area {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 32px; padding: 40px 20px;
+  width: 100%;
+}
+
+/* focal line */
+.focal-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: 100%;
+}
+
+/* the thin line above/below word */
+.focal-line {
+  width: min(480px, 90vw); height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+#wordDisplay {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 8vw, 4rem);
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.2;
+  min-height: 1.3em;
+  max-width: min(600px, 90vw);
+  transition: opacity 0.05s;
+  word-break: break-word;
+}
+#wordDisplay.flash { opacity: 0; }
+
+/* ORP marker — optimal recognition point */
+#orpMarker {
+  width: 2px; height: 8px;
+  background: var(--accent);
+  opacity: 0.4;
+  border-radius: 1px;
+}
+
+/* status */
+#statusMsg {
+  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em;
+  text-transform: uppercase; text-align: center; min-height: 16px;
+}
+
+/* controls hint */
+.controls-hint {
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+}
+.hint { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.08em; }
+.hint span { color: var(--text); }
+
+/* speed nudge buttons */
+.speed-nudge { display: flex; gap: 8px; align-items: center; }
+.nudge-btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.08em; padding: 5px 10px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); cursor: pointer; border-radius: 1px; transition: all 0.12s;
+}
+.nudge-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nudge-label { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; }
+
+/* back button */
+.back-btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.55rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 6px 14px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  cursor: pointer; border-radius: 1px; transition: all 0.15s;
+}
+.back-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* ── DONE ── */
+#done {
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh; gap: 20px; text-align: center;
+  padding: 40px 20px;
+}
+.done-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: clamp(3rem, 10vw, 5rem); letter-spacing: 0.2em;
+  color: var(--gold); text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(212,175,106,0.3);
+  animation: donepop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes donepop { 0%{transform:scale(0.3);opacity:0} 100%{transform:scale(1);opacity:1} }
+.done-stat { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; }
+.done-stat span { color: var(--accent); }
+.done-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.done-btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.65rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 10px 20px; border-radius: 1px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); transition: background 0.15s;
+}
+.done-btn:hover { background: var(--border); }
+.done-btn.primary { border-color: var(--accent); color: var(--accent); background: transparent; }
+.done-btn.primary:hover { background: var(--accent); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup">
+  <div class="logo">Cold Read</div>
+  <div class="tagline">rapid serial visual presentation · subvocalization training</div>
+
+  <div class="paste-wrap">
+    <div class="paste-label">paste your text</div>
+    <textarea id="textInput" placeholder="Paste any text here — article, book passage, notes..."></textarea>
+    <div class="word-count" id="wordCount">0 words</div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="section-label">settings</div>
+
+    <div class="setting-row">
+      <label>speed (wpm)</label>
+      <input type="range" id="slWpm" min="100" max="1000" step="10" value="300">
+      <span class="setting-val" id="outWpm">300 wpm</span>
+    </div>
+
+    <div class="setting-row">
+      <label>words per chunk</label>
+      <input type="range" id="slChunk" min="1" max="10" step="1" value="1">
+      <span class="setting-val" id="outChunk">1 word</span>
+    </div>
+
+    <div class="setting-row">
+      <label>speed ramp</label>
+      <div class="toggle-row" style="flex:1">
+        <button class="toggle-btn active" id="rampOff" onclick="setRamp(false)">off</button>
+        <button class="toggle-btn" id="rampOn" onclick="setRamp(true)">on +10 wpm / 30s</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn" disabled onclick="startReading()">begin</button>
+</div>
+
+<!-- ══ READER ══ -->
+<div id="reader">
+  <div id="hud">
+    <div class="hud-stat"><div class="val" id="hudWpm">300</div><div class="lbl">WPM</div></div>
+    <div class="hud-stat"><div class="val green" id="hudChunk">47</div><div class="lbl">Chunk</div></div>
+    <div class="hud-stat"><div class="val" id="hudTotal">—</div><div class="lbl">Total</div></div>
+    <div class="hud-stat"><div class="val" id="hudPct">0%</div><div class="lbl">Done</div></div>
+    <div class="hud-stat"><div class="val" id="hudTime">—</div><div class="lbl">Left</div></div>
+  </div>
+  <div id="progress-bg"><div id="progress-bar"></div></div>
+
+  <div id="display-area">
+    <div class="focal-wrap">
+      <div class="focal-line"></div>
+      <div id="wordDisplay"></div>
+      <div id="orpMarker"></div>
+      <div class="focal-line"></div>
+    </div>
+
+    <div id="statusMsg">press space to begin</div>
+
+    <div class="speed-nudge">
+      <button class="nudge-btn" onclick="nudgeSpeed(-10)">− 10</button>
+      <div class="nudge-label">wpm</div>
+      <button class="nudge-btn" onclick="nudgeSpeed(+10)">+ 10</button>
+    </div>
+
+    <div class="controls-hint">
+      <div class="hint"><span>space</span> pause / resume</div>
+      <div class="hint"><span>←</span> back 5 chunks</div>
+      <div class="hint"><span>→</span> skip 5 chunks</div>
+      <div class="hint"><span>esc</span> exit</div>
+    </div>
+
+    <button class="back-btn" onclick="exitReader()">← exit</button>
+  </div>
+</div>
+
+<!-- ══ DONE ══ -->
+<div id="done">
+  <div class="done-title">complete</div>
+  <div class="done-stat">read <span id="doneWords">—</span> words</div>
+  <div class="done-stat">average speed: <span id="doneWpm">—</span> wpm</div>
+  <div class="done-stat">time: <span id="doneTime">—</span></div>
+  <div class="done-btns">
+    <button class="done-btn primary" onclick="restartSame()">read again</button>
+    <button class="done-btn" onclick="goSetup()">new text</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+let chunks = [];
+let currentChunk = 0;
+let wpm = 300;
+let chunkSize = 1;
+let rampEnabled = false;
+let playing = false;
+let timer = null;
+let sessionStart = null;
+let wpmHistory = [];
+let rampTimer = null;
+
+// ══════════════════════════════════════════════════
+// SETUP
+// ══════════════════════════════════════════════════
+
+document.getElementById('textInput').addEventListener('input', function() {
+  const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
+  const count = words.length;
+  document.getElementById('wordCount').textContent =
+    count === 0 ? '0 words' : count === 1 ? '1 word' : `${count} words`;
+  document.getElementById('startBtn').disabled = count === 0;
+});
+
+document.getElementById('slWpm').addEventListener('input', function() {
+  wpm = parseInt(this.value);
+  document.getElementById('outWpm').textContent = wpm + ' wpm';
+});
+
+document.getElementById('slChunk').addEventListener('input', function() {
+  chunkSize = parseInt(this.value);
+  document.getElementById('outChunk').textContent =
+    chunkSize === 1 ? '1 word' : `${chunkSize} words`;
+});
+
+function setRamp(val) {
+  rampEnabled = val;
+  document.getElementById('rampOn').classList.toggle('active', val);
+  document.getElementById('rampOff').classList.toggle('active', !val);
+}
+
+// ══════════════════════════════════════════════════
+// TEXT PROCESSING
+// ══════════════════════════════════════════════════
+
+function buildChunks(text) {
+  const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+  const result = [];
+  for (let i = 0; i < words.length; i += chunkSize) {
+    result.push(words.slice(i, i + chunkSize).join(' '));
+  }
+  return result;
+}
+
+// ══════════════════════════════════════════════════
+// READER
+// ══════════════════════════════════════════════════
+
+function startReading() {
+  const text = document.getElementById('textInput').value;
+  chunks = buildChunks(text);
+  currentChunk = 0;
+  wpm = parseInt(document.getElementById('slWpm').value);
+  playing = false;
+  sessionStart = null;
+  wpmHistory = [];
+
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('done').style.display = 'none';
+  document.getElementById('reader').style.display = 'flex';
+
+  updateHud();
+  showChunk(currentChunk);
+  document.getElementById('statusMsg').textContent = 'press space to begin';
+  document.getElementById('hudWpm').textContent = wpm;
+}
+
+function showChunk(idx) {
+  if (idx < 0 || idx >= chunks.length) return;
+  const el = document.getElementById('wordDisplay');
+  el.textContent = chunks[idx];
+
+  // Update hud
+  const pct = Math.round((idx / chunks.length) * 100);
+  document.getElementById('hudChunk').textContent = idx + 1;
+  document.getElementById('hudTotal').textContent = chunks.length;
+  document.getElementById('hudPct').textContent = pct + '%';
+  document.getElementById('progress-bar').style.width = pct + '%';
+
+  // Estimate time left
+  const chunksLeft = chunks.length - idx - 1;
+  const wordsLeft = chunksLeft * chunkSize;
+  const secsLeft = Math.round(wordsLeft / wpm * 60);
+  document.getElementById('hudTime').textContent = formatTime(secsLeft);
+}
+
+function formatTime(secs) {
+  if (secs < 60) return secs + 's';
+  return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+}
+
+function updateHud() {
+  document.getElementById('hudWpm').textContent = wpm;
+}
+
+function msPerChunk() {
+  // At wpm words per minute, each chunk of chunkSize words takes:
+  return (chunkSize / wpm) * 60 * 1000;
+}
+
+function play() {
+  if (playing) return;
+  playing = true;
+  if (!sessionStart) sessionStart = Date.now();
+  document.getElementById('statusMsg').textContent = '';
+  scheduleNext();
+
+  if (rampEnabled) {
+    rampTimer = setInterval(() => {
+      wpm += 10;
+      updateHud();
+    }, 30000);
+  }
+}
+
+function pause() {
+  if (!playing) return;
+  playing = false;
+  clearTimeout(timer);
+  clearInterval(rampTimer);
+  document.getElementById('statusMsg').textContent = 'paused · space to resume';
+}
+
+function scheduleNext() {
+  if (!playing) return;
+  const ms = msPerChunk();
+  timer = setTimeout(() => {
+    if (!playing) return;
+    currentChunk++;
+    if (currentChunk >= chunks.length) {
+      finishReading();
+      return;
+    }
+    showChunk(currentChunk);
+    wpmHistory.push(wpm);
+    scheduleNext();
+  }, ms);
+}
+
+function nudgeSpeed(delta) {
+  wpm = Math.max(50, Math.min(1500, wpm + delta));
+  updateHud();
+  // If playing, the next chunk will use the new speed automatically
+}
+
+function exitReader() {
+  pause();
+  clearInterval(rampTimer);
+  goSetup();
+}
+
+function goSetup() {
+  document.getElementById('reader').style.display = 'none';
+  document.getElementById('done').style.display = 'none';
+  document.getElementById('setup').style.display = 'flex';
+}
+
+function finishReading() {
+  playing = false;
+  clearTimeout(timer);
+  clearInterval(rampTimer);
+
+  const elapsed = Math.round((Date.now() - sessionStart) / 1000);
+  const totalWords = chunks.length * chunkSize;
+  const avgWpm = wpmHistory.length > 0
+    ? Math.round(wpmHistory.reduce((a,b) => a+b, 0) / wpmHistory.length)
+    : wpm;
+
+  document.getElementById('reader').style.display = 'none';
+  document.getElementById('done').style.display = 'flex';
+  document.getElementById('doneWords').textContent = totalWords;
+  document.getElementById('doneWpm').textContent = avgWpm;
+  document.getElementById('doneTime').textContent = formatTime(elapsed);
+}
+
+function restartSame() {
+  document.getElementById('done').style.display = 'none';
+  startReading();
+}
+
+// ══════════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════════
+
+document.addEventListener('keydown', e => {
+  if (document.getElementById('reader').style.display !== 'flex') return;
+  if (e.target.tagName === 'TEXTAREA') return;
+
+  switch(e.key) {
+    case ' ':
+      e.preventDefault();
+      if (playing) pause(); else play();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      pause();
+      currentChunk = Math.max(0, currentChunk - 5);
+      showChunk(currentChunk);
+      document.getElementById('statusMsg').textContent = 'paused · space to resume';
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      pause();
+      currentChunk = Math.min(chunks.length - 1, currentChunk + 5);
+      showChunk(currentChunk);
+      document.getElementById('statusMsg').textContent = 'paused · space to resume';
+      break;
+    case 'Escape':
+      e.preventDefault();
+      exitReader();
+      break;
+  }
+});
+</script>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.0</div>
+</body>
+</html>
