@@ -7,237 +7,98 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Cormorant+Garamond:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #06060a;
-  --surface: #0c0c12;
-  --border: #1c1c28;
-  --accent: #c8a96e;
-  --accent2: #7c9eb2;
-  --gold: #d4af6a;
-  --green: #6dba8a;
-  --warn: #c4884a;
-  --danger: #b85050;
-  --text: #d8d4cc;
-  --muted: #4a4858;
-  --dim: #2a2836;
+  --bg: #06060a; --surface: #0c0c12; --border: #1c1c28;
+  --accent: #c8a96e; --accent2: #7c9eb2; --gold: #d4af6a;
+  --green: #6dba8a; --warn: #c4884a; --danger: #b85050;
+  --text: #d8d4cc; --muted: #4a4858; --dim: #2a2836;
 }
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Share Tech Mono', monospace; min-height: 100vh; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+body::after { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 6px); pointer-events: none; z-index: 1000; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Share Tech Mono', monospace;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow-x: hidden;
-}
-
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 6px);
-  pointer-events: none; z-index: 1000;
-}
-
-/* ── SETUP ── */
-#setup {
-  width: 100%; max-width: 560px;
-  padding: 32px 20px 48px;
-  display: flex; flex-direction: column; gap: 24px;
-  align-items: center;
-}
-
-.logo {
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300; font-size: clamp(2.5rem, 8vw, 4rem);
-  letter-spacing: 0.25em; color: var(--accent);
-  text-shadow: 0 0 40px rgba(200,169,110,0.25);
-  text-transform: uppercase;
-  animation: logopulse 4s ease-in-out infinite;
-}
-@keyframes logopulse {
-  0%,100% { text-shadow: 0 0 30px rgba(200,169,110,0.15); }
-  50%      { text-shadow: 0 0 60px rgba(200,169,110,0.4); }
-}
-.tagline { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -16px; }
-
-/* textarea */
+/* SETUP */
+#setup { width: 100%; max-width: 580px; padding: 28px 20px 48px; display: flex; flex-direction: column; gap: 20px; align-items: center; overflow-y: auto; }
+.logo { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: clamp(2.2rem, 7vw, 3.5rem); letter-spacing: 0.25em; color: var(--accent); text-shadow: 0 0 40px rgba(200,169,110,0.25); text-transform: uppercase; animation: logopulse 4s ease-in-out infinite; }
+@keyframes logopulse { 0%,100%{text-shadow:0 0 30px rgba(200,169,110,0.15)} 50%{text-shadow:0 0 60px rgba(200,169,110,0.4)} }
+.tagline { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: -14px; }
 .paste-wrap { width: 100%; display: flex; flex-direction: column; gap: 6px; }
-.paste-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
-#textInput {
-  width: 100%; height: 160px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 2px; color: var(--text);
-  font-family: 'Cormorant Garamond', serif; font-size: 1rem; line-height: 1.6;
-  padding: 12px 14px; outline: none; resize: vertical;
-  transition: border-color 0.15s;
-}
+.paste-label { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+#textInput { width: 100%; height: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: 2px; color: var(--text); font-family: 'Cormorant Garamond', serif; font-size: 1rem; line-height: 1.6; padding: 12px 14px; outline: none; resize: vertical; transition: border-color 0.15s; }
 #textInput:focus { border-color: var(--accent); }
 #textInput::placeholder { color: var(--muted); font-style: italic; }
-
-.word-count { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; text-align: right; }
-
-/* settings */
-.settings-grid { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-.section-label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 2px; }
-
-.setting-row { display: flex; align-items: center; gap: 12px; }
-.setting-row label { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 140px; }
+.word-count { font-size: 0.48rem; color: var(--muted); letter-spacing: 0.1em; text-align: right; }
+.settings-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.section-label { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 2px; margin-top: 4px; }
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-row label { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; min-width: 130px; }
 .setting-row input[type=range] { flex: 1; accent-color: var(--accent); }
-.setting-val { font-size: 0.8rem; color: var(--accent); min-width: 60px; text-align: right; font-family: 'Share Tech Mono', monospace; }
-
-/* ramp toggle */
-.toggle-row { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
-.toggle-btn {
-  flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.6rem;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  padding: 8px 0; border: none; background: var(--surface); color: var(--muted);
-  cursor: pointer; transition: all 0.15s;
-}
+.setting-val { font-size: 0.75rem; color: var(--accent); min-width: 56px; text-align: right; font-family: 'Share Tech Mono', monospace; }
+.toggle-row { display: flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; flex: 1; }
+.toggle-btn { flex: 1; font-family: 'Share Tech Mono', monospace; font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 0; border: none; background: var(--surface); color: var(--muted); cursor: pointer; transition: all 0.15s; }
 .toggle-btn.active { background: var(--accent); color: #000; }
-
-.start-btn {
-  font-family: 'Cormorant Garamond', serif; font-size: 1.2rem;
-  letter-spacing: 0.25em; text-transform: uppercase;
-  padding: 12px 48px; border: 1px solid var(--accent); background: transparent;
-  color: var(--accent); cursor: pointer; border-radius: 1px; transition: all 0.25s;
-  position: relative; overflow: hidden;
-}
+.sub-row { display: none; margin-left: 130px; }
+.sub-row.visible { display: flex; align-items: center; gap: 10px; }
+.start-btn { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; letter-spacing: 0.25em; text-transform: uppercase; padding: 11px 44px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; border-radius: 1px; transition: all 0.25s; position: relative; overflow: hidden; }
 .start-btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); transition: transform 0.25s; z-index: -1; }
 .start-btn:hover { color: #000; }
 .start-btn:hover::before { transform: translateX(0); }
 .start-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .start-btn:disabled:hover { color: var(--accent); }
 .start-btn:disabled:hover::before { transform: translateX(-100%); }
+#aiStatus { font-size: 0.48rem; color: var(--muted); letter-spacing: 0.1em; text-align: center; min-height: 14px; }
+#aiStatus.loading { color: var(--warn); }
+#aiStatus.ok { color: var(--green); }
+#aiStatus.err { color: var(--danger); }
 
-/* ── READER ── */
-#reader {
-  display: none;
-  width: 100%; max-width: 700px;
-  min-height: 100vh;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* hud */
-#hud {
-  width: 100%; display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
-.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; line-height: 1; color: var(--accent); }
+/* READER */
+#reader { display: none; width: 100%; max-width: 700px; min-height: 100vh; flex-direction: column; align-items: center; }
+#hud { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.hud-stat { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
+.hud-stat .val { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; line-height: 1; color: var(--accent); }
 .hud-stat .val.green { color: var(--green); }
-.hud-stat .lbl { font-size: 0.45rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
-
-/* progress bar */
+.hud-stat .lbl { font-size: 0.42rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
 #progress-bg { width: 100%; height: 2px; background: var(--border); flex-shrink: 0; }
 #progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s linear; }
-
-/* display area */
-#display-area {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 32px; padding: 40px 20px;
-  width: 100%;
-}
-
-/* focal line */
-.focal-wrap {
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  width: 100%;
-}
-
-/* the thin line above/below word */
-.focal-line {
-  width: min(480px, 90vw); height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border), transparent);
-}
-
-#wordDisplay {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(1rem, 8vw, 4rem);
-  font-weight: 400;
-  color: var(--text);
-  letter-spacing: 0.04em;
-  text-align: center;
-  line-height: 1.2;
-  min-height: 1.3em;
-  width: min(600px, 90vw);
-  white-space: nowrap;
-  overflow: hidden;
-  transition: opacity 0.05s;
-}
-#wordDisplay.flash { opacity: 0; }
-
-/* ORP marker — optimal recognition point */
-#orpMarker {
-  width: 2px; height: 8px;
-  background: var(--accent);
-  opacity: 0.4;
-  border-radius: 1px;
-}
-
-/* status */
-#statusMsg {
-  font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em;
-  text-transform: uppercase; text-align: center; min-height: 16px;
-}
-
-/* controls hint */
-.controls-hint {
-  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
-}
-.hint { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.08em; }
+#display-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 32px 20px; width: 100%; }
+.focal-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.focal-line { width: min(480px, 90vw); height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+#wordDisplay { font-family: 'Cormorant Garamond', serif; font-size: clamp(1rem, 8vw, 4rem); font-weight: 400; color: var(--text); letter-spacing: 0.04em; text-align: center; line-height: 1.2; min-height: 1.3em; width: min(600px, 90vw); white-space: nowrap; overflow: hidden; transition: color 0.08s, filter 0.08s; }
+#orpMarker { width: 2px; height: 8px; background: var(--accent); opacity: 0.4; border-radius: 1px; }
+#statusMsg { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; min-height: 16px; }
+.controls-hint { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.hint { font-size: 0.48rem; color: var(--muted); letter-spacing: 0.08em; }
 .hint span { color: var(--text); }
-
-/* speed nudge buttons */
 .speed-nudge { display: flex; gap: 8px; align-items: center; }
-.nudge-btn {
-  font-family: 'Share Tech Mono', monospace; font-size: 0.6rem;
-  letter-spacing: 0.08em; padding: 5px 10px;
-  border: 1px solid var(--border); background: transparent;
-  color: var(--muted); cursor: pointer; border-radius: 1px; transition: all 0.12s;
-}
+.nudge-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; letter-spacing: 0.08em; padding: 5px 10px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; border-radius: 1px; transition: all 0.12s; }
 .nudge-btn:hover { border-color: var(--accent); color: var(--accent); }
-.nudge-label { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.1em; }
-
-/* back button */
-.back-btn {
-  font-family: 'Share Tech Mono', monospace; font-size: 0.55rem;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 6px 14px; border: 1px solid var(--border);
-  background: transparent; color: var(--muted);
-  cursor: pointer; border-radius: 1px; transition: all 0.15s;
-}
+.nudge-label { font-size: 0.48rem; color: var(--muted); letter-spacing: 0.1em; }
+.back-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.52rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; border-radius: 1px; transition: all 0.15s; }
 .back-btn:hover { border-color: var(--muted); color: var(--text); }
 
-/* ── DONE ── */
-#done {
-  display: none; flex-direction: column; align-items: center;
-  justify-content: center; min-height: 100vh; gap: 20px; text-align: center;
-  padding: 40px 20px;
-}
-.done-title {
-  font-family: 'Cormorant Garamond', serif; font-weight: 300;
-  font-size: clamp(3rem, 10vw, 5rem); letter-spacing: 0.2em;
-  color: var(--gold); text-transform: uppercase;
-  text-shadow: 0 0 40px rgba(212,175,106,0.3);
-  animation: donepop 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
-}
+/* QUESTION OVERLAY */
+#questionOverlay { display: none; position: fixed; inset: 0; background: rgba(6,6,10,0.96); z-index: 800; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 32px 20px; }
+#questionOverlay.visible { display: flex; }
+.q-label { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
+#questionText { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.1rem, 3.5vw, 1.6rem); color: var(--text); text-align: center; max-width: 520px; line-height: 1.7; font-style: italic; }
+#questionOptions { display: flex; flex-direction: column; gap: 8px; width: min(480px, 90vw); }
+.q-option { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; letter-spacing: 0.06em; padding: 10px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; border-radius: 2px; transition: all 0.12s; text-align: left; }
+.q-option:hover { border-color: var(--accent); color: var(--accent); }
+.q-option.correct { border-color: var(--green); color: var(--green); background: rgba(109,186,138,0.08); }
+.q-option.wrong { border-color: var(--danger); color: var(--danger); background: rgba(184,80,80,0.08); }
+.q-option:disabled { cursor: default; }
+#qFeedback { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); min-height: 18px; text-align: center; }
+#qContinue { display: none; font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 20px; border: 1px solid var(--accent2); background: transparent; color: var(--accent2); cursor: pointer; border-radius: 2px; }
+#qContinue:hover { background: var(--accent2); color: #000; }
+#qScore { font-size: 0.52rem; color: var(--muted); letter-spacing: 0.1em; }
+
+/* DONE */
+#done { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 18px; text-align: center; padding: 40px 20px; }
+.done-title { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: clamp(3rem, 10vw, 5rem); letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; text-shadow: 0 0 40px rgba(212,175,106,0.3); animation: donepop 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
 @keyframes donepop { 0%{transform:scale(0.3);opacity:0} 100%{transform:scale(1);opacity:1} }
-.done-stat { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; }
+.done-stat { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.1em; }
 .done-stat span { color: var(--accent); }
 .done-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
-.done-btn {
-  font-family: 'Share Tech Mono', monospace; font-size: 0.65rem;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 10px 20px; border-radius: 1px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface);
-  color: var(--text); transition: background 0.15s;
-}
+.done-btn { font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 20px; border-radius: 1px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background 0.15s; }
 .done-btn:hover { background: var(--border); }
 .done-btn.primary { border-color: var(--accent); color: var(--accent); background: transparent; }
 .done-btn.primary:hover { background: var(--accent); color: #000; }
@@ -245,10 +106,10 @@ body::after {
 </head>
 <body>
 
-<!-- ══ SETUP ══ -->
+<!-- SETUP -->
 <div id="setup">
   <div class="logo">Cold Read</div>
-  <div class="tagline">rapid serial visual presentation · subvocalization training</div>
+  <div class="tagline">rsvp · subvocalization training</div>
 
   <div class="paste-wrap">
     <div class="paste-label">paste your text</div>
@@ -257,7 +118,7 @@ body::after {
   </div>
 
   <div class="settings-grid">
-    <div class="section-label">settings</div>
+    <div class="section-label">core</div>
 
     <div class="setting-row">
       <label>speed (wpm)</label>
@@ -271,23 +132,93 @@ body::after {
       <span class="setting-val" id="outChunk">1 word</span>
     </div>
 
+    <div class="section-label">training modes</div>
+
+    <!-- Speed Ramp -->
     <div class="setting-row">
       <label>speed ramp</label>
-      <div class="toggle-row" style="flex:1">
-        <button class="toggle-btn active" id="rampOff" onclick="setRamp(false)">off</button>
-        <button class="toggle-btn" id="rampOn" onclick="setRamp(true)">on +10 wpm / 30s</button>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="rampOff" onclick="setToggle('ramp',false)">off</button>
+        <button class="toggle-btn" id="rampOn" onclick="setToggle('ramp',true)">+10 wpm / 30s</button>
       </div>
+    </div>
+
+    <!-- Metronome -->
+    <div class="setting-row">
+      <label>metronome</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="metroOff" onclick="setToggle('metro',false)">off</button>
+        <button class="toggle-btn" id="metroClick" onclick="setToggle('metro','click')">click</button>
+        <button class="toggle-btn" id="metroTone" onclick="setToggle('metro','tone')">tone</button>
+      </div>
+    </div>
+    <div class="sub-row" id="metroVolumeRow">
+      <label style="font-size:0.48rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;min-width:130px;">volume</label>
+      <input type="range" id="slMetroVol" min="1" max="100" step="1" value="30" style="flex:1;accent-color:var(--accent)">
+      <span class="setting-val" id="outMetroVol">30%</span>
+    </div>
+
+    <!-- Color Flash -->
+    <div class="setting-row">
+      <label>color flash</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="colorOff" onclick="setToggle('color',false)">off</button>
+        <button class="toggle-btn" id="colorOn" onclick="setToggle('color',true)">on</button>
+      </div>
+    </div>
+    <div class="sub-row" id="colorIntensityRow">
+      <label style="font-size:0.48rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;min-width:130px;">intensity</label>
+      <input type="range" id="slColorIntensity" min="1" max="10" step="1" value="5" style="flex:1;accent-color:var(--accent)">
+      <span class="setting-val" id="outColorIntensity">5</span>
+    </div>
+
+    <!-- Blur -->
+    <div class="setting-row">
+      <label>blur</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="blurOff" onclick="setToggle('blur',false)">off</button>
+        <button class="toggle-btn" id="blurOn" onclick="setToggle('blur',true)">on</button>
+      </div>
+    </div>
+    <div class="sub-row" id="blurAmountRow">
+      <label style="font-size:0.48rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;min-width:130px;">amount</label>
+      <input type="range" id="slBlur" min="1" max="10" step="1" value="3" style="flex:1;accent-color:var(--accent)">
+      <span class="setting-val" id="outBlur">3</span>
+    </div>
+
+    <!-- Scramble -->
+    <div class="setting-row">
+      <label>scramble</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="scrambleOff" onclick="setToggle('scramble',false)">off</button>
+        <button class="toggle-btn" id="scrambleOn" onclick="setToggle('scramble',true)">on</button>
+      </div>
+    </div>
+
+    <!-- Comprehension Questions -->
+    <div class="setting-row">
+      <label>questions (AI)</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="questionsOff" onclick="setToggle('questions',false)">off</button>
+        <button class="toggle-btn" id="questionsOn" onclick="setToggle('questions',true)">on</button>
+      </div>
+    </div>
+    <div class="sub-row" id="questionsIntervalRow">
+      <label style="font-size:0.48rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;min-width:130px;">every</label>
+      <input type="range" id="slQInterval" min="1" max="5" step="1" value="2" style="flex:1;accent-color:var(--accent)">
+      <span class="setting-val" id="outQInterval">2 min</span>
     </div>
   </div>
 
+  <div id="aiStatus"></div>
   <button class="start-btn" id="startBtn" disabled onclick="startReading()">begin</button>
 </div>
 
-<!-- ══ READER ══ -->
+<!-- READER -->
 <div id="reader">
   <div id="hud">
     <div class="hud-stat"><div class="val" id="hudWpm">300</div><div class="lbl">WPM</div></div>
-    <div class="hud-stat"><div class="val green" id="hudChunk">47</div><div class="lbl">Chunk</div></div>
+    <div class="hud-stat"><div class="val green" id="hudChunk">1</div><div class="lbl">Chunk</div></div>
     <div class="hud-stat"><div class="val" id="hudTotal">—</div><div class="lbl">Total</div></div>
     <div class="hud-stat"><div class="val" id="hudPct">0%</div><div class="lbl">Done</div></div>
     <div class="hud-stat"><div class="val" id="hudTime">—</div><div class="lbl">Left</div></div>
@@ -301,32 +232,39 @@ body::after {
       <div id="orpMarker"></div>
       <div class="focal-line"></div>
     </div>
-
     <div id="statusMsg">press space to begin</div>
-
     <div class="speed-nudge">
       <button class="nudge-btn" onclick="nudgeSpeed(-10)">− 10</button>
       <div class="nudge-label">wpm</div>
       <button class="nudge-btn" onclick="nudgeSpeed(+10)">+ 10</button>
     </div>
-
     <div class="controls-hint">
-      <div class="hint"><span>space</span> pause / resume</div>
-      <div class="hint"><span>←</span> back 5 chunks</div>
-      <div class="hint"><span>→</span> skip 5 chunks</div>
+      <div class="hint"><span>space</span> pause/resume</div>
+      <div class="hint"><span>←</span> back 5</div>
+      <div class="hint"><span>→</span> skip 5</div>
       <div class="hint"><span>esc</span> exit</div>
     </div>
-
     <button class="back-btn" onclick="exitReader()">← exit</button>
   </div>
 </div>
 
-<!-- ══ DONE ══ -->
+<!-- QUESTION OVERLAY -->
+<div id="questionOverlay">
+  <div class="q-label">comprehension check</div>
+  <div id="questionText"></div>
+  <div id="questionOptions"></div>
+  <div id="qFeedback"></div>
+  <div id="qScore"></div>
+  <button id="qContinue" onclick="resumeAfterQuestion()">continue reading →</button>
+</div>
+
+<!-- DONE -->
 <div id="done">
   <div class="done-title">complete</div>
   <div class="done-stat">read <span id="doneWords">—</span> words</div>
   <div class="done-stat">average speed: <span id="doneWpm">—</span> wpm</div>
   <div class="done-stat">time: <span id="doneTime">—</span></div>
+  <div class="done-stat">comprehension: <span id="doneScore">—</span></div>
   <div class="done-btns">
     <button class="done-btn primary" onclick="restartSame()">read again</button>
     <button class="done-btn" onclick="goSetup()">new text</button>
@@ -335,25 +273,305 @@ body::after {
 
 <script>
 // ══════════════════════════════════════════════════
+// FEATURE TOGGLES
+// ══════════════════════════════════════════════════
+const opts = {
+  ramp: false,
+  metro: false,       // false | 'click' | 'tone'
+  color: false,
+  blur: false,
+  scramble: false,
+  questions: false,
+};
+
+let metroVolume = 0.3;
+let colorIntensity = 5;
+let blurAmount = 3;
+let questionInterval = 2; // minutes
+
+function setToggle(key, val) {
+  opts[key] = val;
+
+  // Update button states
+  if (key === 'ramp') {
+    document.getElementById('rampOn').classList.toggle('active', val);
+    document.getElementById('rampOff').classList.toggle('active', !val);
+  } else if (key === 'metro') {
+    ['Off','Click','Tone'].forEach(s => document.getElementById('metro'+s).classList.remove('active'));
+    if (val === false) document.getElementById('metroOff').classList.add('active');
+    else if (val === 'click') document.getElementById('metroClick').classList.add('active');
+    else if (val === 'tone') document.getElementById('metroTone').classList.add('active');
+    document.getElementById('metroVolumeRow').classList.toggle('visible', val !== false);
+  } else if (key === 'color') {
+    document.getElementById('colorOn').classList.toggle('active', val);
+    document.getElementById('colorOff').classList.toggle('active', !val);
+    document.getElementById('colorIntensityRow').classList.toggle('visible', val);
+  } else if (key === 'blur') {
+    document.getElementById('blurOn').classList.toggle('active', val);
+    document.getElementById('blurOff').classList.toggle('active', !val);
+    document.getElementById('blurAmountRow').classList.toggle('visible', val);
+  } else if (key === 'scramble') {
+    document.getElementById('scrambleOn').classList.toggle('active', val);
+    document.getElementById('scrambleOff').classList.toggle('active', !val);
+  } else if (key === 'questions') {
+    document.getElementById('questionsOn').classList.toggle('active', val);
+    document.getElementById('questionsOff').classList.toggle('active', !val);
+    document.getElementById('questionsIntervalRow').classList.toggle('visible', val);
+    if (val && storedText) generateQuestions(storedText);
+  }
+}
+
+// Sub-sliders
+document.getElementById('slMetroVol').addEventListener('input', function() {
+  metroVolume = parseInt(this.value) / 100;
+  document.getElementById('outMetroVol').textContent = this.value + '%';
+});
+document.getElementById('slColorIntensity').addEventListener('input', function() {
+  colorIntensity = parseInt(this.value);
+  document.getElementById('outColorIntensity').textContent = this.value;
+});
+document.getElementById('slBlur').addEventListener('input', function() {
+  blurAmount = parseInt(this.value);
+  document.getElementById('outBlur').textContent = this.value;
+});
+document.getElementById('slQInterval').addEventListener('input', function() {
+  questionInterval = parseInt(this.value);
+  document.getElementById('outQInterval').textContent = this.value + ' min';
+});
+
+// ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
 let chunks = [];
 let currentChunk = 0;
 let wpm = 300;
 let chunkSize = 1;
-let rampEnabled = false;
 let playing = false;
 let timer = null;
 let sessionStart = null;
 let wpmHistory = [];
 let rampTimer = null;
+let metroTimer = null;
+let storedText = '';
+
+// Questions state
+let questions = [];
+let qIndex = 0;
+let qCorrect = 0;
+let qTotal = 0;
+let lastQuestionTime = 0;
+let questionPending = false;
 
 // ══════════════════════════════════════════════════
-// SETUP
+// AUDIO (Web Audio API — no external files needed)
 // ══════════════════════════════════════════════════
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playClick(vol) {
+  try {
+    const ctx = getAudioCtx();
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.01, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / 20);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = ctx.createGain();
+    gain.gain.value = vol * 2;
+    src.connect(gain); gain.connect(ctx.destination);
+    src.start();
+  } catch(e) {}
+}
+
+function playTone(vol) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(vol * 0.4, ctx.currentTime + 0.005);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.04);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.05);
+  } catch(e) {}
+}
+
+function playMetroBeat() {
+  if (!playing) return;
+  if (opts.metro === 'click') playClick(metroVolume);
+  else if (opts.metro === 'tone') playTone(metroVolume);
+}
+
+// ══════════════════════════════════════════════════
+// COLOR FLASH
+// ══════════════════════════════════════════════════
+const FLASH_COLORS = ['#c8a96e','#d4af6a','#7c9eb2','#6dba8a','#c4884a'];
+let colorIdx = 0;
+
+function flashColor(el) {
+  if (!opts.color) return;
+  const color = FLASH_COLORS[colorIdx % FLASH_COLORS.length];
+  colorIdx++;
+  const duration = 80 + colorIntensity * 12; // 80-200ms
+  el.style.color = color;
+  el.style.textShadow = `0 0 ${colorIntensity * 4}px ${color}`;
+  setTimeout(() => {
+    el.style.color = '';
+    el.style.textShadow = '';
+  }, duration);
+}
+
+// ══════════════════════════════════════════════════
+// BLUR
+// ══════════════════════════════════════════════════
+function applyBlur(el) {
+  if (!opts.blur) { el.style.filter = ''; return; }
+  el.style.filter = `blur(${blurAmount * 0.4}px)`;
+}
+
+// ══════════════════════════════════════════════════
+// SCRAMBLE — middle letters only, first+last fixed
+// ══════════════════════════════════════════════════
+function scrambleWord(word) {
+  if (word.length <= 3) return word;
+  const first = word[0];
+  const last = word[word.length - 1];
+  const middle = word.slice(1, -1).split('');
+  // Fisher-Yates shuffle
+  for (let i = middle.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [middle[i], middle[j]] = [middle[j], middle[i]];
+  }
+  return first + middle.join('') + last;
+}
+
+function scrambleChunk(chunk) {
+  if (!opts.scramble) return chunk;
+  return chunk.split(' ').map(w => {
+    // Preserve punctuation
+    const match = w.match(/^([^a-zA-Z]*)([a-zA-Z]+)([^a-zA-Z]*)$/);
+    if (!match) return w;
+    return match[1] + scrambleWord(match[2]) + match[3];
+  }).join(' ');
+}
+
+// ══════════════════════════════════════════════════
+// AI COMPREHENSION QUESTIONS
+// ══════════════════════════════════════════════════
+async function generateQuestions(text) {
+  if (!opts.questions) return;
+  document.getElementById('aiStatus').textContent = 'generating questions...';
+  document.getElementById('aiStatus').className = 'loading';
+
+  // Truncate text to avoid token limits
+  const excerpt = text.slice(0, 3000);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `Generate 6 multiple-choice comprehension questions for the following text. Return ONLY valid JSON, no markdown, no explanation. Format:
+[{"q":"question text","options":["A","B","C","D"],"answer":0}]
+where answer is the 0-based index of the correct option.
+
+Text:
+${excerpt}`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content?.[0]?.text || '[]';
+    // Strip any markdown fences just in case
+    const clean = raw.replace(/```json|```/g, '').trim();
+    questions = JSON.parse(clean);
+    qIndex = 0; qCorrect = 0; qTotal = 0;
+    document.getElementById('aiStatus').textContent = `${questions.length} questions ready`;
+    document.getElementById('aiStatus').className = 'ok';
+    setTimeout(() => { document.getElementById('aiStatus').textContent = ''; document.getElementById('aiStatus').className = ''; }, 3000);
+  } catch(e) {
+    console.error('Question generation failed:', e);
+    document.getElementById('aiStatus').textContent = 'question generation failed — continuing without';
+    document.getElementById('aiStatus').className = 'err';
+    opts.questions = false;
+  }
+}
+
+function checkForQuestion() {
+  if (!opts.questions || !playing || questions.length === 0) return;
+  if (questionPending) return;
+  const elapsed = (Date.now() - lastQuestionTime) / 1000 / 60; // minutes
+  if (elapsed >= questionInterval && qIndex < questions.length) {
+    questionPending = true;
+    pause();
+    showQuestion();
+  }
+}
+
+function showQuestion() {
+  const q = questions[qIndex];
+  if (!q) { resumeAfterQuestion(); return; }
+
+  document.getElementById('questionText').textContent = q.q;
+  document.getElementById('qFeedback').textContent = '';
+  document.getElementById('qContinue').style.display = 'none';
+  document.getElementById('qScore').textContent =
+    qTotal > 0 ? `${qCorrect}/${qTotal} correct so far` : '';
+
+  const optsEl = document.getElementById('questionOptions');
+  optsEl.innerHTML = q.options.map((opt, i) =>
+    `<button class="q-option" onclick="answerQuestion(${i})">${opt}</button>`
+  ).join('');
+
+  document.getElementById('questionOverlay').classList.add('visible');
+}
+
+function answerQuestion(chosen) {
+  const q = questions[qIndex];
+  qTotal++;
+  const correct = chosen === q.answer;
+  if (correct) qCorrect++;
+
+  // Disable all options
+  document.querySelectorAll('.q-option').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.answer) btn.classList.add('correct');
+    else if (i === chosen && !correct) btn.classList.add('wrong');
+  });
+
+  document.getElementById('qFeedback').textContent = correct ? 'correct ✓' : 'incorrect';
+  document.getElementById('qFeedback').style.color = correct ? 'var(--green)' : 'var(--danger)';
+  document.getElementById('qScore').textContent = `${qCorrect}/${qTotal} correct`;
+  document.getElementById('qContinue').style.display = 'block';
+  qIndex++;
+}
+
+function resumeAfterQuestion() {
+  document.getElementById('questionOverlay').classList.remove('visible');
+  questionPending = false;
+  lastQuestionTime = Date.now();
+  play();
+}
+
+// ══════════════════════════════════════════════════
+// SETUP LISTENERS
+// ══════════════════════════════════════════════════
+let storedTextPrev = '';
 
 document.getElementById('textInput').addEventListener('input', function() {
-  const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
+  storedText = this.value;
+  const words = storedText.trim().split(/\s+/).filter(w => w.length > 0);
   const count = words.length;
   document.getElementById('wordCount').textContent =
     count === 0 ? '0 words' : count === 1 ? '1 word' : `${count} words`;
@@ -371,16 +589,9 @@ document.getElementById('slChunk').addEventListener('input', function() {
     chunkSize === 1 ? '1 word' : `${chunkSize} words`;
 });
 
-function setRamp(val) {
-  rampEnabled = val;
-  document.getElementById('rampOn').classList.toggle('active', val);
-  document.getElementById('rampOff').classList.toggle('active', !val);
-}
-
 // ══════════════════════════════════════════════════
 // TEXT PROCESSING
 // ══════════════════════════════════════════════════
-
 function buildChunks(text) {
   const words = text.trim().split(/\s+/).filter(w => w.length > 0);
   const result = [];
@@ -391,17 +602,33 @@ function buildChunks(text) {
 }
 
 // ══════════════════════════════════════════════════
+// FIT TEXT
+// ══════════════════════════════════════════════════
+function fitText(el) {
+  const maxSize = 64, minSize = 14;
+  const containerWidth = el.offsetWidth;
+  let size = maxSize;
+  el.style.fontSize = size + 'px';
+  while (el.scrollWidth > containerWidth && size > minSize) {
+    size--;
+    el.style.fontSize = size + 'px';
+  }
+}
+
+// ══════════════════════════════════════════════════
 // READER
 // ══════════════════════════════════════════════════
-
-function startReading() {
-  const text = document.getElementById('textInput').value;
-  chunks = buildChunks(text);
-  currentChunk = 0;
+async function startReading() {
   wpm = parseInt(document.getElementById('slWpm').value);
+  chunkSize = parseInt(document.getElementById('slChunk').value);
+  chunks = buildChunks(storedText);
+  currentChunk = 0;
   playing = false;
   sessionStart = null;
   wpmHistory = [];
+  lastQuestionTime = Date.now();
+  questionPending = false;
+  colorIdx = 0;
 
   document.getElementById('setup').style.display = 'none';
   document.getElementById('done').style.display = 'none';
@@ -410,39 +637,30 @@ function startReading() {
   updateHud();
   showChunk(currentChunk);
   document.getElementById('statusMsg').textContent = 'press space to begin';
-  document.getElementById('hudWpm').textContent = wpm;
-}
 
-function fitText(el) {
-  // Start at max size and shrink until text fits in one line
-  const maxSize = 64;
-  const minSize = 14;
-  const containerWidth = el.offsetWidth;
-  let size = maxSize;
-  el.style.fontSize = size + 'px';
-  while (el.scrollWidth > containerWidth && size > minSize) {
-    size -= 1;
-    el.style.fontSize = size + 'px';
+  // Generate questions if enabled and not yet generated
+  if (opts.questions && questions.length === 0) {
+    await generateQuestions(storedText);
   }
 }
 
 function showChunk(idx) {
   if (idx < 0 || idx >= chunks.length) return;
   const el = document.getElementById('wordDisplay');
-  el.textContent = chunks[idx];
+  const text = scrambleChunk(chunks[idx]);
+  el.textContent = text;
   fitText(el);
+  applyBlur(el);
+  flashColor(el);
 
-  // Update hud
   const pct = Math.round((idx / chunks.length) * 100);
   document.getElementById('hudChunk').textContent = idx + 1;
   document.getElementById('hudTotal').textContent = chunks.length;
   document.getElementById('hudPct').textContent = pct + '%';
   document.getElementById('progress-bar').style.width = pct + '%';
 
-  // Estimate time left
   const chunksLeft = chunks.length - idx - 1;
-  const wordsLeft = chunksLeft * chunkSize;
-  const secsLeft = Math.round(wordsLeft / wpm * 60);
+  const secsLeft = Math.round((chunksLeft * chunkSize) / wpm * 60);
   document.getElementById('hudTime').textContent = formatTime(secsLeft);
 }
 
@@ -456,7 +674,6 @@ function updateHud() {
 }
 
 function msPerChunk() {
-  // At wpm words per minute, each chunk of chunkSize words takes:
   return (chunkSize / wpm) * 60 * 1000;
 }
 
@@ -467,11 +684,14 @@ function play() {
   document.getElementById('statusMsg').textContent = '';
   scheduleNext();
 
-  if (rampEnabled) {
-    rampTimer = setInterval(() => {
-      wpm += 10;
-      updateHud();
-    }, 30000);
+  if (opts.ramp) {
+    rampTimer = setInterval(() => { wpm += 10; updateHud(); }, 30000);
+  }
+
+  if (opts.metro !== false) {
+    const ms = msPerChunk();
+    playMetroBeat();
+    metroTimer = setInterval(playMetroBeat, ms);
   }
 }
 
@@ -480,7 +700,10 @@ function pause() {
   playing = false;
   clearTimeout(timer);
   clearInterval(rampTimer);
-  document.getElementById('statusMsg').textContent = 'paused · space to resume';
+  clearInterval(metroTimer);
+  if (!questionPending) {
+    document.getElementById('statusMsg').textContent = 'paused · space to resume';
+  }
 }
 
 function scheduleNext() {
@@ -489,12 +712,10 @@ function scheduleNext() {
   timer = setTimeout(() => {
     if (!playing) return;
     currentChunk++;
-    if (currentChunk >= chunks.length) {
-      finishReading();
-      return;
-    }
+    if (currentChunk >= chunks.length) { finishReading(); return; }
     showChunk(currentChunk);
     wpmHistory.push(wpm);
+    checkForQuestion();
     scheduleNext();
   }, ms);
 }
@@ -502,12 +723,18 @@ function scheduleNext() {
 function nudgeSpeed(delta) {
   wpm = Math.max(50, Math.min(1500, wpm + delta));
   updateHud();
-  // If playing, the next chunk will use the new speed automatically
+  // Restart metronome at new speed
+  if (opts.metro !== false && playing) {
+    clearInterval(metroTimer);
+    metroTimer = setInterval(playMetroBeat, msPerChunk());
+  }
 }
 
 function exitReader() {
   pause();
   clearInterval(rampTimer);
+  clearInterval(metroTimer);
+  document.getElementById('questionOverlay').classList.remove('visible');
   goSetup();
 }
 
@@ -515,12 +742,14 @@ function goSetup() {
   document.getElementById('reader').style.display = 'none';
   document.getElementById('done').style.display = 'none';
   document.getElementById('setup').style.display = 'flex';
+  questions = []; // reset so new text generates fresh questions
 }
 
 function finishReading() {
   playing = false;
   clearTimeout(timer);
   clearInterval(rampTimer);
+  clearInterval(metroTimer);
 
   const elapsed = Math.round((Date.now() - sessionStart) / 1000);
   const totalWords = chunks.length * chunkSize;
@@ -533,20 +762,23 @@ function finishReading() {
   document.getElementById('doneWords').textContent = totalWords;
   document.getElementById('doneWpm').textContent = avgWpm;
   document.getElementById('doneTime').textContent = formatTime(elapsed);
+  document.getElementById('doneScore').textContent =
+    qTotal > 0 ? `${qCorrect}/${qTotal} correct` : 'n/a';
 }
 
 function restartSame() {
   document.getElementById('done').style.display = 'none';
+  qIndex = 0; qCorrect = 0; qTotal = 0; // reset score but keep questions
   startReading();
 }
 
 // ══════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════
-
 document.addEventListener('keydown', e => {
   if (document.getElementById('reader').style.display !== 'flex') return;
-  if (e.target.tagName === 'TEXTAREA') return;
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+  if (document.getElementById('questionOverlay').classList.contains('visible')) return;
 
   switch(e.key) {
     case ' ':
@@ -574,6 +806,6 @@ document.addEventListener('keydown', e => {
   }
 });
 </script>
-<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v1.1</div>
+<div style="position:fixed;bottom:8px;right:10px;font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.1em;z-index:999;">v2.0</div>
 </body>
 </html>
