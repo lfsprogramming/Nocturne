@@ -22,7 +22,6 @@
 #media-list { border: 0.5px solid var(--border); }
 .media-row {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
   padding: 0.9rem 1.2rem;
   border-bottom: 0.5px solid var(--border);
@@ -35,7 +34,8 @@
   color: var(--text-dim);
   letter-spacing: 0.05em;
   white-space: nowrap;
-  margin-left: 1rem;
+  min-width: 2.8rem;
+  margin-right: 1rem;
 }
 #media-empty, #media-loading {
   padding: 1.5rem;
@@ -131,8 +131,8 @@ function render() {
 
   listEl.innerHTML = rows.map(r => `
     <div class="media-row">
-      <span class="m-title">${escapeHtml(r.title)}</span>
       <span class="m-score">${r.interest_score ?? '—'}</span>
+      <span class="m-title">${escapeHtml(r.title)}</span>
     </div>
   `).join('');
 }
