@@ -44,6 +44,18 @@
   font-size: 12px;
   letter-spacing: 0.06em;
 }
+#search-box {
+  width: 100%;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  margin-bottom: 1rem;
+}
+#search-box::placeholder { color: var(--text-faint); }
 </style>
 </head>
 <body>
@@ -61,6 +73,7 @@
     <select id="type-select">
       <option value="">All types</option>
     </select>
+    <input type="text" id="search-box" placeholder="search titles…">
     <div id="media-list"></div>
   </div>
 
@@ -85,6 +98,7 @@ async function sbFetch(path) {
 }
 
 let mediaTypes = [];
+let allTitles = [];
 
 async function loadTypes() {
   mediaTypes = await sbFetch('media_types?select=id,name&order=name');
@@ -97,14 +111,18 @@ async function loadTypes() {
   }
 }
 
-async function loadTitles(typeId) {
+async function loadAllTitles() {
+  allTitles = await sbFetch('titles?select=id,title,interest_score,media_type_id&order=interest_score.asc.nullslast');
+}
+
+function render() {
   const listEl = document.getElementById('media-list');
-  listEl.innerHTML = '<div id="media-loading">loading…</div>';
+  const typeId = document.getElementById('type-select').value;
+  const search = document.getElementById('search-box').value.trim().toLowerCase();
 
-  let path = 'titles?select=id,title,interest_score&order=interest_score.asc.nullslast';
-  if (typeId) path += `&media_type_id=eq.${typeId}`;
-
-  const rows = await sbFetch(path);
+  let rows = allTitles;
+  if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
+  if (search) rows = rows.filter(r => r.title.toLowerCase().includes(search));
 
   if (!rows.length) {
     listEl.innerHTML = '<div id="media-empty">nothing here yet</div>';
@@ -125,17 +143,18 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
-document.getElementById('type-select').addEventListener('change', (e) => {
-  loadTitles(e.target.value || null);
-});
+document.getElementById('type-select').addEventListener('change', render);
+document.getElementById('search-box').addEventListener('input', render);
 
 (async function init() {
+  const listEl = document.getElementById('media-list');
+  listEl.innerHTML = '<div id="media-loading">loading…</div>';
   try {
     await loadTypes();
-    await loadTitles(null);
+    await loadAllTitles();
+    render();
   } catch (err) {
-    document.getElementById('media-list').innerHTML =
-      `<div id="media-empty">failed to load: ${escapeHtml(err.message)}</div>`;
+    listEl.innerHTML = `<div id="media-empty">failed to load: ${escapeHtml(err.message)}</div>`;
   }
 })();
 </script>
