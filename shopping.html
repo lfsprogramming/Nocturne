@@ -71,11 +71,35 @@
 .row.busy { opacity: 0.55; pointer-events: none; }
 #empty, #loading { padding: 1.5rem; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; line-height: 1.7; }
 
+[hidden] { display: none !important; }
+
+/* add form */
+#add-panel { border: 0.5px solid var(--border); background: var(--bg-card); padding: 0.9rem; margin-bottom: 0.8rem; }
+#add-panel > * + * { margin-top: 0.6rem; }
+#add-panel input, #add-panel select {
+  width: 100%;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  padding: 9px 10px;
+  color-scheme: dark;
+}
+#add-panel input::placeholder { color: var(--text-faint); }
+.field-row { display: flex; gap: 0.6rem; }
+.field-row > * { flex: 1; min-width: 0; }
+.field-row > .btn { flex: 0 0 auto; }
+.form-buttons { display: flex; gap: 0.6rem; }
+#add-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); min-height: 1.3em; line-height: 1.5; }
+#add-msg.err { color: #d0645c; }
+#add-msg.ok { color: var(--teal); }
+
 /* login */
 #login { max-width: 420px; margin: 2rem auto; }
 #login p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; margin-bottom: 1rem; line-height: 1.7; }
 #login input { width: 100%; background: var(--bg-card); border: 0.5px solid var(--border); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 10px 12px; margin-bottom: 1rem; }
-.btn { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; background: var(--bg-card); color: var(--gold); border: 0.5px solid var(--gold-dim); padding: 8px 16px; cursor: pointer; }
+.btn { white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; background: var(--bg-card); color: var(--gold); border: 0.5px solid var(--gold-dim); padding: 8px 16px; cursor: pointer; }
 .btn:disabled { color: var(--text-faint); border-color: var(--border); cursor: default; }
 #login-msg { min-height: 1.5em; margin-top: 1rem; margin-bottom: 0; }
 #login-msg.err { color: #d0645c; }
@@ -115,8 +139,32 @@
     </div>
 
     <div id="bar">
+      <button class="btn" id="add-toggle">+ add item</button>
       <span id="status"></span>
       <button id="signout">sign out</button>
+    </div>
+
+    <div id="add-panel" hidden>
+      <input type="text" id="f-item" placeholder="item" maxlength="200" autocomplete="off">
+      <div class="field-row">
+        <input type="text" id="f-importance" inputmode="decimal" placeholder="importance" autocomplete="off">
+        <input type="date" id="f-deadline" aria-label="deadline">
+      </div>
+      <div class="field-row">
+        <input type="text" id="f-quantity" inputmode="decimal" placeholder="quantity" autocomplete="off">
+        <select id="f-unit" aria-label="unit"><option value="">unit</option></select>
+      </div>
+      <div class="field-row" id="new-unit-row" hidden>
+        <input type="text" id="f-new-unit" placeholder="new unit, e.g. cans" maxlength="40" autocomplete="off">
+        <button class="btn" id="save-unit">save unit</button>
+      </div>
+      <select id="f-category" aria-label="category"><option value="">category</option></select>
+      <input type="text" id="f-notes" placeholder="notes (optional)" autocomplete="off">
+      <div id="add-msg"></div>
+      <div class="form-buttons">
+        <button class="btn" id="add-btn">add</button>
+        <button class="btn" id="add-close">close</button>
+      </div>
     </div>
 
     <div id="list"></div>
@@ -269,6 +317,143 @@ async function changeStatus(id, next) {
   render();
 }
 
+/* ---------- adding items and units ---------- */
+
+let units = [];
+let adding = false;
+let dupConfirmed = false;
+
+function setAddMsg(text, kind) {
+  const el = document.getElementById('add-msg');
+  el.textContent = text;
+  el.className = kind || '';
+}
+
+function fillCategorySelects() {
+  for (const id of ['cat-select', 'f-category']) {
+    const sel = document.getElementById(id);
+    for (const c of categories) {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name; sel.appendChild(o);
+    }
+  }
+}
+
+function fillUnitSelect(selectId) {
+  const sel = document.getElementById('f-unit');
+  sel.innerHTML = '<option value="">unit</option>'
+    + units.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('')
+    + '<option value="__new">+ new unit…</option>';
+  sel.value = selectId ? String(selectId) : '';
+}
+
+function norm(s) {
+  return s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^the /, '');
+}
+
+// Titles alias easily ("the", punctuation, one name inside another), so warn before adding a near-duplicate.
+function similarItems(name) {
+  const n = norm(name);
+  if (!n) return [];
+  return items.filter(i => i.status === 'open').filter(i => {
+    const m = norm(i.item);
+    return m === n || (n.length >= 4 && m.length >= 4 && (m.includes(n) || n.includes(m)));
+  });
+}
+
+function resetForm() {
+  for (const id of ['f-item', 'f-importance', 'f-deadline', 'f-quantity', 'f-new-unit', 'f-notes']) {
+    document.getElementById(id).value = '';
+  }
+  document.getElementById('f-category').value = '';
+  fillUnitSelect(null);
+  document.getElementById('new-unit-row').hidden = true;
+  dupConfirmed = false;
+  document.getElementById('add-btn').textContent = 'add';
+}
+
+function authExpired(e) {
+  if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return true; }
+  return false;
+}
+
+async function addItem() {
+  if (adding) return;
+  const name = document.getElementById('f-item').value.trim();
+  const imp = document.getElementById('f-importance').value.trim();
+  const qty = document.getElementById('f-quantity').value.trim();
+  const problems = [];
+  if (!name) problems.push('item name is required');
+  if (imp && !/^\d{1,2}(\.\d+)?$/.test(imp)) problems.push('importance must be a number like 0.5');
+  if (qty && !(/^\d+(\.\d+)?$/.test(qty) && Number(qty) > 0)) problems.push('quantity must be a positive number');
+  if (problems.length) { setAddMsg(problems.join('; '), 'err'); return; }
+
+  const dups = similarItems(name);
+  if (dups.length && !dupConfirmed) {
+    dupConfirmed = true;
+    document.getElementById('add-btn').textContent = 'add anyway';
+    setAddMsg('already on the list: ' + dups.map(d => d.item).join(', ') + ' — press "add anyway" to add it regardless', 'err');
+    return;
+  }
+
+  const body = { item: name };
+  if (imp) body.importance = Number(imp);
+  const deadline = document.getElementById('f-deadline').value;
+  if (deadline) body.deadline = deadline;
+  if (qty) body.quantity = Number(qty);
+  const unit = document.getElementById('f-unit').value;
+  if (unit && unit !== '__new') body.quantity_type_id = Number(unit);
+  const cat = document.getElementById('f-category').value;
+  if (cat) body.category_id = Number(cat);
+  const notes = document.getElementById('f-notes').value.trim();
+  if (notes) body.notes = notes;
+
+  adding = true;
+  document.getElementById('add-btn').disabled = true;
+  setAddMsg('adding…');
+  try {
+    const rows = await NAuth.rest('shopping', SELECT, { method: 'POST', body, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1 || rows[0].item !== name) throw new Error('not saved (no permission?)');
+    items.push(rows[0]);
+    resetForm();
+    render();
+    const shown = !!document.querySelector(`.row[data-id="${rows[0].id}"]`);
+    setAddMsg('');
+    setStatus('✓ added: ' + name + (shown ? '' : ' (hidden by the current filter)'), 'ok');
+    document.getElementById('f-item').focus();
+  } catch (e) {
+    if (!authExpired(e)) setAddMsg('could not add: ' + e.message, 'err');
+  }
+  adding = false;
+  document.getElementById('add-btn').disabled = false;
+}
+
+async function saveUnit() {
+  const name = document.getElementById('f-new-unit').value.trim();
+  if (!name) { setAddMsg('type a unit name first', 'err'); return; }
+  const existing = units.find(u => u.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    fillUnitSelect(existing.id);
+    document.getElementById('new-unit-row').hidden = true;
+    document.getElementById('f-new-unit').value = '';
+    setAddMsg('"' + existing.name + '" already exists — selected it', 'ok');
+    return;
+  }
+  try {
+    const rows = await NAuth.rest('shopping', 'quantity_types?select=id,name',
+      { method: 'POST', body: { name }, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    units.push(rows[0]);
+    units.sort((a, b) => a.name.localeCompare(b.name));
+    fillUnitSelect(rows[0].id);
+    document.getElementById('new-unit-row').hidden = true;
+    document.getElementById('f-new-unit').value = '';
+    setAddMsg('✓ unit added: ' + name, 'ok');
+  } catch (e) {
+    if (!authExpired(e)) setAddMsg('could not add unit: ' + e.message, 'err');
+  }
+}
+
 /* ---------- login ---------- */
 
 function showLogin(msg, kind) {
@@ -311,6 +496,26 @@ listEl.addEventListener('click', e => {
   }
 });
 
+document.getElementById('add-toggle').addEventListener('click', () => {
+  const panel = document.getElementById('add-panel');
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) document.getElementById('f-item').focus();
+});
+document.getElementById('add-close').addEventListener('click', () => { document.getElementById('add-panel').hidden = true; });
+document.getElementById('add-btn').addEventListener('click', addItem);
+document.getElementById('save-unit').addEventListener('click', saveUnit);
+document.getElementById('f-item').addEventListener('input', () => {
+  dupConfirmed = false;
+  document.getElementById('add-btn').textContent = 'add';
+});
+document.getElementById('f-item').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+document.getElementById('f-new-unit').addEventListener('keydown', e => { if (e.key === 'Enter') saveUnit(); });
+document.getElementById('f-unit').addEventListener('change', e => {
+  const isNew = e.target.value === '__new';
+  document.getElementById('new-unit-row').hidden = !isNew;
+  if (isNew) document.getElementById('f-new-unit').focus();
+});
+
 document.getElementById('cat-select').addEventListener('change', render);
 document.getElementById('show-closed').addEventListener('change', render);
 document.querySelectorAll('input[name="sort"]').forEach(el => el.addEventListener('change', () => {
@@ -339,15 +544,13 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
 
   listEl.innerHTML = '<div id="loading">loading…</div>';
   try {
-    [categories, items] = await Promise.all([
+    [categories, items, units] = await Promise.all([
       NAuth.rest('shopping', 'categories?select=id,name&order=name'),
       NAuth.rest('shopping', SELECT),
+      NAuth.rest('shopping', 'quantity_types?select=id,name&order=name'),
     ]);
-    const sel = document.getElementById('cat-select');
-    for (const c of categories) {
-      const o = document.createElement('option');
-      o.value = c.id; o.textContent = c.name; sel.appendChild(o);
-    }
+    fillCategorySelects();
+    fillUnitSelect(null);
     render();
   } catch (e) {
     if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
