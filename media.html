@@ -56,6 +56,33 @@
   margin-bottom: 1rem;
 }
 #search-box::placeholder { color: var(--text-faint); }
+#filters {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.filter-group {
+  border: 0.5px solid var(--border);
+  padding: 0.5rem 0.9rem;
+}
+.filter-group legend {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--gold-dim);
+  text-transform: uppercase;
+  padding: 0 0.4rem;
+}
+.filter-group label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  margin-right: 1rem;
+  cursor: pointer;
+}
+.filter-group input { accent-color: var(--gold); margin-right: 0.3rem; }
 </style>
 </head>
 <body>
@@ -74,6 +101,22 @@
       <option value="">All types</option>
     </select>
     <input type="text" id="search-box" placeholder="search titles…">
+
+    <div id="filters">
+      <fieldset class="filter-group">
+        <legend>MKV</legend>
+        <label><input type="radio" name="mkv-filter" value="" checked> off</label>
+        <label><input type="radio" name="mkv-filter" value="true"> true</label>
+        <label><input type="radio" name="mkv-filter" value="false"> false</label>
+      </fieldset>
+      <fieldset class="filter-group">
+        <legend>MP4 (Jellyfin)</legend>
+        <label><input type="radio" name="jf-filter" value="" checked> off</label>
+        <label><input type="radio" name="jf-filter" value="true"> true</label>
+        <label><input type="radio" name="jf-filter" value="false"> false</label>
+      </fieldset>
+    </div>
+
     <div id="media-list"></div>
   </div>
 
@@ -112,17 +155,25 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,interest_score,media_type_id&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
+}
+
+function radioValue(name) {
+  return document.querySelector(`input[name="${name}"]:checked`).value;
 }
 
 function render() {
   const listEl = document.getElementById('media-list');
   const typeId = document.getElementById('type-select').value;
   const search = document.getElementById('search-box').value.trim().toLowerCase();
+  const mkvFilter = radioValue('mkv-filter');
+  const jfFilter = radioValue('jf-filter');
 
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
   if (search) rows = rows.filter(r => r.title.toLowerCase().includes(search));
+  if (mkvFilter) rows = rows.filter(r => !!r.has_mkv === (mkvFilter === 'true'));
+  if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
   if (!rows.length) {
     listEl.innerHTML = '<div id="media-empty">nothing here yet</div>';
@@ -145,6 +196,8 @@ function escapeHtml(s) {
 
 document.getElementById('type-select').addEventListener('change', render);
 document.getElementById('search-box').addEventListener('input', render);
+document.querySelectorAll('input[name="mkv-filter"], input[name="jf-filter"]')
+  .forEach(el => el.addEventListener('change', render));
 
 (async function init() {
   const listEl = document.getElementById('media-list');
