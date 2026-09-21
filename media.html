@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media — Nocturne</title>
+<link rel="stylesheet" href="style.css">
+<style>
+#media-wrap { max-width: 640px; margin: 0 auto; }
+#type-select {
+  width: 100%;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  margin-bottom: 2rem;
+}
+#media-list { border: 0.5px solid var(--border); }
+.media-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 0.5px solid var(--border);
+}
+.media-row:last-child { border-bottom: none; }
+.media-row .m-title { color: var(--text); font-size: 17px; }
+.media-row .m-score {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  margin-left: 1rem;
+}
+#media-empty, #media-loading {
+  padding: 1.5rem;
+  color: var(--text-dim);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+</style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+
+<div class="page-wrap">
+
+  <div class="page-header">
+    <h1>Media</h1>
+    <p class="byline">what's actually here — sorted most-wanted first</p>
+  </div>
+
+  <div id="media-wrap">
+    <select id="type-select">
+      <option value="">All types</option>
+    </select>
+    <div id="media-list"></div>
+  </div>
+
+</div>
+
+<footer>nocturne &mdash; built slowly, in the dark</footer>
+
+<script>
+const SUPABASE_URL = 'https://rthghgzdwqnlzvsoerhz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RvrKhg03c_vSx1wYwpSNFw_oRVuTVCQ';
+
+async function sbFetch(path) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Accept-Profile': 'media',
+    },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+let mediaTypes = [];
+
+async function loadTypes() {
+  mediaTypes = await sbFetch('media_types?select=id,name&order=name');
+  const select = document.getElementById('type-select');
+  for (const t of mediaTypes) {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    select.appendChild(opt);
+  }
+}
+
+async function loadTitles(typeId) {
+  const listEl = document.getElementById('media-list');
+  listEl.innerHTML = '<div id="media-loading">loading…</div>';
+
+  let path = 'titles?select=id,title,interest_score&order=interest_score.asc.nullslast';
+  if (typeId) path += `&media_type_id=eq.${typeId}`;
+
+  const rows = await sbFetch(path);
+
+  if (!rows.length) {
+    listEl.innerHTML = '<div id="media-empty">nothing here yet</div>';
+    return;
+  }
+
+  listEl.innerHTML = rows.map(r => `
+    <div class="media-row">
+      <span class="m-title">${escapeHtml(r.title)}</span>
+      <span class="m-score">${r.interest_score ?? '—'}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+document.getElementById('type-select').addEventListener('change', (e) => {
+  loadTitles(e.target.value || null);
+});
+
+(async function init() {
+  try {
+    await loadTypes();
+    await loadTitles(null);
+  } catch (err) {
+    document.getElementById('media-list').innerHTML =
+      `<div id="media-empty">failed to load: ${escapeHtml(err.message)}</div>`;
+  }
+})();
+</script>
+
+</body>
+</html>
