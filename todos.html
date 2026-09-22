@@ -79,6 +79,8 @@
 .row.closed .name { text-decoration: line-through; color: var(--text-dim); }
 .row.closed .badge { display: none; }
 .undo { margin-left: 0.6rem; background: none; border: 0.5px solid var(--gold-dim); color: var(--gold); font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; padding: 1px 8px; cursor: pointer; }
+.review-btn { margin-left: 0.6rem; background: none; border: 0.5px solid #4a9d6e; color: #4a9d6e; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1; padding: 2px 7px; cursor: pointer; vertical-align: middle; }
+.review-btn:hover { background: #4a9d6e; color: var(--bg); }
 .row.busy { opacity: 0.55; pointer-events: none; }
 #empty, #loading { padding: 1.5rem; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; line-height: 1.7; }
 
@@ -144,6 +146,7 @@
         <span class="lead">sort</span>
         <label><input type="radio" name="sort" value="priority" checked>priority</label>
         <label><input type="radio" name="sort" value="deadline">deadline</label>
+        <label><input type="radio" name="sort" value="reviewed">least recently reviewed</label>
       </div>
       <div class="opt-group">
         <label><input type="checkbox" id="show-closed">show closed</label>
@@ -184,7 +187,7 @@
 
 <script>
 const UNDO_MS = 6000;
-const SELECT = 'items?select=id,title,description,priority_score,deadline,status,closed_on,created_at,category_id,category:categories(name)';
+const SELECT = 'items?select=id,title,description,priority_score,deadline,status,closed_on,created_at,reviewed_on,category_id,category:categories(name)';
 
 let items = [];
 let categories = [];
@@ -231,12 +234,27 @@ function fmtDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function reviewedText(reviewedOn) {
+  if (!reviewedOn) return 'never reviewed';
+  const days = Math.floor((Date.now() - new Date(reviewedOn).getTime()) / 86400000);
+  if (days <= 0) return 'reviewed today';
+  if (days === 1) return 'reviewed 1d ago';
+  return 'reviewed ' + days + 'd ago';
+}
+
 /* ---------- rendering ---------- */
 
 function num(a, b) {                       // ascending, nulls last
   if (a == null && b == null) return 0;
   if (a == null) return 1;
   if (b == null) return -1;
+  return a - b;
+}
+
+function numNullsFirst(a, b) {              // ascending, nulls first (never-reviewed surfaces first)
+  if (a == null && b == null) return 0;
+  if (a == null) return -1;
+  if (b == null) return 1;
   return a - b;
 }
 
@@ -249,13 +267,18 @@ function sortedVisible() {
   if (cat) rows = rows.filter(i => String(i.category_id) === cat);
 
   const dl = i => (i.deadline ? new Date(i.deadline + 'T00:00:00').getTime() : null);
+  const rv = i => (i.reviewed_on ? new Date(i.reviewed_on).getTime() : null);
   const byCreated = (a, b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0;
   rows.sort((a, b) => {
     const open = (b.status === 'open') - (a.status === 'open');   // open items above closed ones
     if (open) return open;
-    const primary = mode === 'deadline' ? num(dl(a), dl(b)) : num(a.priority_score, b.priority_score);
+    const primary = mode === 'deadline' ? num(dl(a), dl(b))
+                   : mode === 'reviewed' ? numNullsFirst(rv(a), rv(b))
+                   : num(a.priority_score, b.priority_score);
     if (primary) return primary;
-    const secondary = mode === 'deadline' ? num(a.priority_score, b.priority_score) : num(dl(a), dl(b));
+    const secondary = mode === 'deadline' ? num(a.priority_score, b.priority_score)
+                     : mode === 'reviewed' ? num(a.priority_score, b.priority_score)
+                     : num(dl(a), dl(b));
     return secondary || byCreated(a, b);
   });
   return rows;
@@ -265,17 +288,18 @@ function rowHtml(i) {
   const closed = i.status !== 'open';
   const editingThis = editingPriority === i.id;
   const pre = [i.category ? i.category.name : ''].filter(Boolean).map(escapeHtml).join(' · ');
-  const post = [i.deadline ? 'due ' + fmtDate(i.deadline) : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const post = [i.deadline ? 'due ' + fmtDate(i.deadline) : '', reviewedText(i.reviewed_on)].filter(Boolean).map(escapeHtml).join(' · ');
   const pri = editingThis
     ? `<input type="text" inputmode="decimal" id="pri-edit-input" class="pri-edit" value="${i.priority_score != null ? escapeHtml(String(Number(i.priority_score))) : ''}" placeholder="none">`
     : `<span class="pri" data-act="edit-priority">★ ${i.priority_score != null ? escapeHtml(String(Number(i.priority_score))) : '—'}</span>`;
   const badge = !closed && i.deadline ? deadlineBadge(i.deadline) : '';
   const undo = recent.has(i.id) ? `<button class="undo" data-act="undo">undo</button>` : '';
+  const reviewBtn = `<button class="review-btn" data-act="review" title="mark reviewed today">✓</button>`;
   return `
   <div class="row${closed ? ' closed' : ''}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}">
     <label class="tick"><input type="checkbox" data-act="done"${i.status === 'done' ? ' checked' : ''}>done</label>
     <div class="main">
-      <div class="name">${escapeHtml(i.title)}${undo}</div>
+      <div class="name">${escapeHtml(i.title)}${reviewBtn}${undo}</div>
       <div class="meta">${pre ? pre + ' · ' : ''}${pri}${post ? ' · ' + post : ''}${badge}</div>
       ${i.description ? `<div class="notes">${escapeHtml(i.description)}</div>` : ''}
     </div>
@@ -320,6 +344,31 @@ async function changeStatus(id, next) {
     clearTimeout(recent.get(id)); recent.delete(id);
     if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
     else setStatus('could not save "' + item.title + '": ' + e.message, 'err');
+  }
+  busy.delete(id);
+  render();
+}
+
+/* ---------- marking reviewed ---------- */
+
+async function markReviewed(id) {
+  const item = items.find(i => i.id === id);
+  if (!item || busy.has(id)) return;
+  const prev = item.reviewed_on;
+  const now = new Date().toISOString();
+  busy.add(id);
+  item.reviewed_on = now;
+  render();
+  try {
+    const rows = await NAuth.rest('todos', 'items?id=eq.' + encodeURIComponent(id),
+      { method: 'PATCH', body: { reviewed_on: now }, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    item.reviewed_on = rows[0].reviewed_on;
+    setStatus('✓ marked reviewed: ' + item.title, 'ok');
+  } catch (e) {
+    item.reviewed_on = prev;
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setStatus('could not mark reviewed "' + item.title + '": ' + e.message, 'err');
   }
   busy.delete(id);
   render();
@@ -542,6 +591,9 @@ listEl.addEventListener('click', e => {
   }
   if (e.target.dataset && e.target.dataset.act === 'edit-priority') {
     startEditPriority(Number(e.target.closest('.row').dataset.id));
+  }
+  if (e.target.dataset && e.target.dataset.act === 'review') {
+    markReviewed(Number(e.target.closest('.row').dataset.id));
   }
 });
 listEl.addEventListener('blur', e => {
