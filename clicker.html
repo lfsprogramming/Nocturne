@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clicker — Nocturne</title>
+<link rel="stylesheet" href="style.css">
+<style>
+#wrap { max-width: 480px; margin: 0 auto; }
+#bar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 0.8rem;
+  background: var(--bg);
+  padding: 0.5rem 0;
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 0.9rem;
+  min-height: 2.6rem;
+}
+#status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); }
+#status.err { color: #d0645c; }
+#status.ok { color: var(--teal); }
+#signout { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; cursor: pointer; color: var(--text-dim); background: none; border: none; }
+#signout:hover { color: var(--gold); }
+.btn { white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; background: var(--bg-card); color: var(--gold); border: 0.5px solid var(--gold-dim); padding: 8px 16px; cursor: pointer; }
+.btn:disabled { color: var(--text-faint); border-color: var(--border); cursor: default; }
+.btn.on { color: var(--bg); background: var(--gold); }
+#plus-btn { font-size: 16px; line-height: 1; padding: 7px 14px; }
+
+#list { display: flex; flex-direction: column; gap: 0.6rem; }
+.card {
+  border: 0.5px solid var(--border);
+  background: var(--bg-card);
+  padding: 1.1rem 1.2rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.08s, border-color 0.15s;
+}
+.card:active { background: #16162a; }
+.card.flash { border-color: var(--gold); }
+.card.edit-mode { border-color: var(--gold-dim); }
+.card.busy { opacity: 0.5; pointer-events: none; }
+.card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem; }
+.c-name { font-size: 19px; color: var(--text); }
+.c-tally { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.04em; color: var(--gold-dim); white-space: nowrap; }
+.c-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--text-dim); margin-top: 3px; }
+.c-undo { margin-left: 0.6rem; background: none; border: 0.5px solid var(--gold-dim); color: var(--gold); font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; padding: 1px 8px; cursor: pointer; }
+
+.edit-panel { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 0.5px solid var(--border); cursor: default; }
+.edit-panel > * + * { margin-top: 0.55rem; }
+.edit-panel input, .edit-panel select {
+  width: 100%;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 15px;
+  padding: 8px 9px;
+  color-scheme: dark;
+}
+.field-row { display: flex; gap: 0.6rem; }
+.field-row > * { flex: 1; min-width: 0; }
+.edit-actions { display: flex; gap: 0.6rem; }
+.edit-actions .btn { flex: 1; }
+.btn.hide-btn { color: #d0645c; border-color: #6a2f2c; }
+#edit-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); min-height: 1.2em; }
+#edit-msg.err { color: #d0645c; }
+
+#manage-panel { border: 0.5px solid var(--border); background: var(--bg-card); padding: 0.9rem; margin-bottom: 0.8rem; }
+#manage-panel > * + * { margin-top: 0.7rem; }
+.manage-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.15em; color: var(--gold-dim); text-transform: uppercase; }
+.manage-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 40vh; overflow-y: auto; }
+.manage-row { display: flex; align-items: center; gap: 0.6rem; font-size: 15px; }
+.manage-row input { accent-color: var(--gold); width: 18px; height: 18px; }
+.manage-row.is-hidden { color: var(--text-dim); }
+#add-item-panel { border-top: 0.5px solid var(--border); padding-top: 0.7rem; }
+#add-item-panel > * + * { margin-top: 0.6rem; }
+#add-item-panel input, #add-item-panel select {
+  width: 100%; background: var(--bg); border: 0.5px solid var(--border); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 16px; padding: 9px 10px; color-scheme: dark;
+}
+#add-item-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); min-height: 1.2em; }
+#add-item-msg.err { color: #d0645c; }
+#add-item-msg.ok { color: var(--teal); }
+
+#empty, #loading { padding: 1.5rem; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; line-height: 1.7; }
+[hidden] { display: none !important; }
+
+#login { max-width: 420px; margin: 2rem auto; }
+#login p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; margin-bottom: 1rem; line-height: 1.7; }
+#login input { width: 100%; background: var(--bg-card); border: 0.5px solid var(--border); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 10px 12px; margin-bottom: 1rem; }
+#login-msg { min-height: 1.5em; margin-top: 1rem; margin-bottom: 0; }
+#login-msg.err { color: #d0645c; }
+#login-msg.ok { color: var(--teal); }
+</style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+<script src="auth.js"></script>
+
+<div class="page-wrap">
+
+  <div class="page-header">
+    <h1>Clicker</h1>
+    <p class="byline">tap to log — private, needs login</p>
+  </div>
+
+  <div id="login" hidden>
+    <p>this list is private. enter your email and a sign-in link will be sent to it.</p>
+    <input type="email" id="login-email" placeholder="email" autocomplete="email">
+    <button class="btn" id="login-btn">send link</button>
+    <p id="login-msg"></p>
+  </div>
+
+  <div id="wrap" hidden>
+    <div id="bar">
+      <button class="btn" id="edit-toggle">edit</button>
+      <button class="btn" id="plus-btn" hidden>+</button>
+      <span id="status"></span>
+      <button id="signout">sign out</button>
+    </div>
+
+    <div id="manage-panel" hidden>
+      <div class="manage-title">show / hide</div>
+      <div class="manage-list" id="manage-list"></div>
+      <button class="btn" id="add-item-toggle">+ add new item</button>
+      <div id="add-item-panel" hidden>
+        <input type="text" id="f-name" placeholder="item name" maxlength="200" autocomplete="off">
+        <div class="field-row">
+          <input type="text" id="f-qty" inputmode="decimal" placeholder="quantity per click (default 1)" autocomplete="off">
+          <select id="f-qtype" aria-label="quantity type"><option value="">no unit</option></select>
+        </div>
+        <div class="field-row" id="f-new-qtype-row" hidden>
+          <input type="text" id="f-new-qtype" placeholder="new unit, e.g. rep" maxlength="40" autocomplete="off">
+          <button class="btn" id="save-qtype">save unit</button>
+        </div>
+        <div id="add-item-msg"></div>
+        <button class="btn" id="add-item-btn">add item</button>
+      </div>
+    </div>
+
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<footer>nocturne &mdash; built slowly, in the dark</footer>
+
+<script>
+const UNDO_MS = 5000;
+
+let items = [];
+let qtypes = [];
+const todayTotals = {};       // item id -> number logged today
+const recent = new Map();     // item id -> { logId, qty, timer }
+const busy = new Set();       // item ids with a click save in flight
+let editMode = false;
+const expandedEdit = new Set(); // item ids showing their edit panel (edit mode only)
+let managePanelOpen = false;
+let addingItemOpen = false;
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function setStatus(text, kind) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = kind || '';
+}
+
+function startOfTodayIso() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function qtypeName(id) {
+  const t = qtypes.find(q => q.id === id);
+  return t ? t.name : '';
+}
+
+/* ---------- rendering ---------- */
+
+function render() {
+  renderBar();
+  renderList();
+  renderManagePanel();
+}
+
+function renderBar() {
+  const editBtn = document.getElementById('edit-toggle');
+  editBtn.textContent = editMode ? 'done' : 'edit';
+  editBtn.className = 'btn' + (editMode ? ' on' : '');
+  document.getElementById('plus-btn').hidden = !editMode;
+  if (!editMode) {
+    managePanelOpen = false;
+    document.getElementById('manage-panel').hidden = true;
+  }
+}
+
+function cardHtml(i) {
+  const isExp = expandedEdit.has(i.id);
+  const total = todayTotals[i.id] || 0;
+  const unit = i.quantity_type_id ? ' ' + escapeHtml(qtypeName(i.quantity_type_id)) : '';
+  const rec = recent.get(i.id);
+  const undo = rec ? `<button class="c-undo" data-act="undo">undo</button>` : '';
+
+  if (!editMode) {
+    return `
+    <div class="card${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log">
+      <div class="card-top">
+        <span class="c-name">${escapeHtml(i.name)}</span>
+        <span class="c-tally">${total}${unit} today${undo}</span>
+      </div>
+    </div>`;
+  }
+
+  const perClick = Number(i.quantity_per_click);
+  const sub = `${perClick}${unit ? unit : ''} / click`;
+  const panel = isExp ? `
+      <div class="edit-panel" data-act="stop">
+        <input type="text" class="e-name" placeholder="item name" value="${escapeHtml(i.name)}">
+        <div class="field-row">
+          <input type="text" class="e-qty" inputmode="decimal" placeholder="quantity per click" value="${escapeHtml(String(perClick))}">
+          <select class="e-qtype">${qtypeOptions(i.quantity_type_id)}</select>
+        </div>
+        <div class="field-row e-new-qtype-row" hidden>
+          <input type="text" class="e-new-qtype" placeholder="new unit, e.g. rep" maxlength="40">
+          <button class="btn" data-act="save-qtype">save unit</button>
+        </div>
+        <div class="edit-actions">
+          <button class="btn" data-act="save">save</button>
+          <button class="btn hide-btn" data-act="hide">hide</button>
+        </div>
+        <div class="edit-msg"></div>
+      </div>` : '';
+  return `
+    <div class="card edit-mode${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="edit-toggle-row">
+      <div class="card-top">
+        <span class="c-name">${escapeHtml(i.name)}</span>
+        <span class="c-tally">${sub}</span>
+      </div>
+      ${panel}
+    </div>`;
+}
+
+function qtypeOptions(selectedId) {
+  let html = `<option value=""${!selectedId ? ' selected' : ''}>no unit</option>`;
+  for (const t of qtypes) {
+    html += `<option value="${t.id}"${t.id === selectedId ? ' selected' : ''}>${escapeHtml(t.name)}</option>`;
+  }
+  html += `<option value="__new">+ new unit…</option>`;
+  return html;
+}
+
+function renderList() {
+  const listEl = document.getElementById('list');
+  const visible = items.filter(i => !i.hidden);
+  if (!visible.length) {
+    listEl.innerHTML = `<div id="empty">nothing here yet. tap "edit" then "+" to add an item.</div>`;
+    return;
+  }
+  listEl.innerHTML = visible.map(cardHtml).join('');
+}
+
+function renderManagePanel() {
+  const panel = document.getElementById('manage-panel');
+  panel.hidden = !managePanelOpen;
+  if (!managePanelOpen) return;
+  const listEl = document.getElementById('manage-list');
+  listEl.innerHTML = items.map(i => `
+    <label class="manage-row${i.hidden ? ' is-hidden' : ''}">
+      <input type="checkbox" data-id="${i.id}" data-act="toggle-hidden"${i.hidden ? '' : ' checked'}>
+      ${escapeHtml(i.name)}
+    </label>`).join('') || '<span style="color:var(--text-dim);font-size:13px">no items yet</span>';
+  document.getElementById('add-item-panel').hidden = !addingItemOpen;
+  const sel = document.getElementById('f-qtype');
+  const prevVal = sel.value;
+  fillQtypeSelect(sel);
+  if ([...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
+}
+
+function fillQtypeSelect(sel) {
+  const keep = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(keep);
+  for (const t of qtypes) {
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = t.name; sel.appendChild(o);
+  }
+  const opt = document.createElement('option');
+  opt.value = '__new'; opt.textContent = '+ new unit…';
+  sel.appendChild(opt);
+}
+
+/* ---------- logging a click ---------- */
+
+async function logClick(id) {
+  const item = items.find(i => i.id === id);
+  if (!item || busy.has(id)) return;
+  const qty = Number(item.quantity_per_click);
+  todayTotals[id] = (todayTotals[id] || 0) + qty;
+  busy.add(id);
+  render();
+  try {
+    const rows = await NAuth.rest('clicker', 'logs?select=id,logged_at',
+      { method: 'POST', body: { item_id: id, quantity: qty, quantity_type_id: item.quantity_type_id }, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    const logId = rows[0].id;
+    clearTimeout((recent.get(id) || {}).timer);
+    const timer = setTimeout(() => { recent.delete(id); render(); }, UNDO_MS);
+    recent.set(id, { logId, qty, timer });
+    setStatus('✓ logged: ' + item.name, 'ok');
+  } catch (e) {
+    todayTotals[id] -= qty;
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setStatus('could not log "' + item.name + '": ' + e.message, 'err');
+  }
+  busy.delete(id);
+  render();
+}
+
+async function undoClick(id) {
+  const rec = recent.get(id);
+  if (!rec || busy.has(id)) return;
+  clearTimeout(rec.timer);
+  busy.add(id);
+  render();
+  try {
+    await NAuth.rest('clicker', 'logs?id=eq.' + encodeURIComponent(rec.logId), { method: 'DELETE' });
+    todayTotals[id] = Math.max(0, (todayTotals[id] || 0) - rec.qty);
+    recent.delete(id);
+    setStatus('✓ undone', 'ok');
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setStatus('could not undo: ' + e.message, 'err');
+  }
+  busy.delete(id);
+  render();
+}
+
+/* ---------- editing an item ---------- */
+
+function setEditMsg(row, text, kind) {
+  const el = row.querySelector('.edit-msg');
+  if (el) { el.textContent = text; el.className = 'edit-msg' + (kind ? ' ' + kind : ''); }
+}
+
+async function saveItem(id, row) {
+  const item = items.find(i => i.id === id);
+  if (!item || busy.has(id)) return;
+  const name = row.querySelector('.e-name').value.trim();
+  const qtyRaw = row.querySelector('.e-qty').value.trim();
+  const qtypeSel = row.querySelector('.e-qtype').value;
+  if (!name) { setEditMsg(row, 'name is required', 'err'); return; }
+  if (qtypeSel === '__new') { setEditMsg(row, 'save or clear the new unit first', 'err'); return; }
+  if (qtyRaw && !/^\d{1,6}(\.\d+)?$/.test(qtyRaw)) { setEditMsg(row, 'quantity must be a number', 'err'); return; }
+  const body = {
+    name,
+    quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
+    quantity_type_id: qtypeSel ? Number(qtypeSel) : null,
+  };
+  busy.add(id);
+  render();
+  try {
+    const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id),
+      { method: 'PATCH', body, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    Object.assign(item, body);
+    expandedEdit.delete(id);
+    setStatus('✓ saved: ' + name, 'ok');
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
+    setStatus('could not save: ' + e.message, 'err');
+  }
+  busy.delete(id);
+  render();
+}
+
+async function hideItem(id) {
+  const item = items.find(i => i.id === id);
+  if (!item || busy.has(id)) return;
+  busy.add(id);
+  render();
+  try {
+    const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id),
+      { method: 'PATCH', body: { hidden: true }, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    item.hidden = true;
+    expandedEdit.delete(id);
+    setStatus('✓ hidden: ' + item.name, 'ok');
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setStatus('could not hide: ' + e.message, 'err');
+  }
+  busy.delete(id);
+  render();
+}
+
+async function setHidden(id, hidden) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  const prev = item.hidden;
+  item.hidden = hidden;
+  render();
+  try {
+    const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id),
+      { method: 'PATCH', body: { hidden }, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+  } catch (e) {
+    item.hidden = prev;
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setStatus('could not update: ' + e.message, 'err');
+    render();
+  }
+}
+
+/* ---------- adding a quantity type inline (shared by add-item panel and per-row edit) ---------- */
+
+async function saveQtype(name) {
+  name = name.trim();
+  if (!name) return null;
+  const existing = qtypes.find(t => t.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing;
+  const rows = await NAuth.rest('clicker', 'quantity_types?select=id,name',
+    { method: 'POST', body: { name }, prefer: 'return=representation' });
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+  qtypes.push(rows[0]);
+  qtypes.sort((a, b) => a.name.localeCompare(b.name));
+  return rows[0];
+}
+
+/* ---------- adding a new item ---------- */
+
+async function addItem() {
+  const name = document.getElementById('f-name').value.trim();
+  const qtyRaw = document.getElementById('f-qty').value.trim();
+  const qtypeSel = document.getElementById('f-qtype').value;
+  const msgEl = document.getElementById('add-item-msg');
+  const setMsg = (t, k) => { msgEl.textContent = t; msgEl.className = k || ''; };
+
+  if (!name) { setMsg('name is required', 'err'); return; }
+  if (qtypeSel === '__new') { setMsg('save or clear the new unit first', 'err'); return; }
+  if (qtyRaw && !/^\d{1,6}(\.\d+)?$/.test(qtyRaw)) { setMsg('quantity must be a number', 'err'); return; }
+
+  const body = {
+    name,
+    quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
+    quantity_type_id: qtypeSel ? Number(qtypeSel) : null,
+  };
+  setMsg('adding…');
+  try {
+    const rows = await NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden',
+      { method: 'POST', body, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    items.push(rows[0]);
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-qty').value = '';
+    document.getElementById('f-qtype').value = '';
+    document.getElementById('f-new-qtype-row').hidden = true;
+    setMsg('✓ added: ' + name, 'ok');
+    addingItemOpen = false;
+    render();
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
+    setMsg('could not add: ' + e.message, 'err');
+  }
+}
+
+/* ---------- login ---------- */
+
+function showLogin(msg, kind) {
+  document.getElementById('wrap').hidden = true;
+  document.getElementById('login').hidden = false;
+  setLoginMsg(msg || '', kind);
+}
+function setLoginMsg(msg, kind) {
+  const el = document.getElementById('login-msg');
+  el.textContent = msg;
+  el.className = kind || '';
+}
+async function sendLink() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) return;
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  setLoginMsg('sending…');
+  try {
+    await NAuth.sendLink(email);
+    setLoginMsg('link sent — open it on this device.', 'ok');
+  } catch (e) {
+    setLoginMsg('could not send link: ' + e.message, 'err');
+  }
+  btn.disabled = false;
+}
+
+/* ---------- events ---------- */
+
+document.getElementById('edit-toggle').addEventListener('click', () => {
+  editMode = !editMode;
+  expandedEdit.clear();
+  render();
+});
+
+document.getElementById('plus-btn').addEventListener('click', () => {
+  managePanelOpen = !managePanelOpen;
+  addingItemOpen = false;
+  render();
+});
+
+document.getElementById('add-item-toggle').addEventListener('click', () => {
+  addingItemOpen = !addingItemOpen;
+  document.getElementById('add-item-panel').hidden = !addingItemOpen;
+  if (addingItemOpen) document.getElementById('f-name').focus();
+});
+
+document.getElementById('add-item-btn').addEventListener('click', addItem);
+document.getElementById('f-name').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+
+document.getElementById('f-qtype').addEventListener('change', e => {
+  const isNew = e.target.value === '__new';
+  document.getElementById('f-new-qtype-row').hidden = !isNew;
+  if (isNew) document.getElementById('f-new-qtype').focus();
+});
+document.getElementById('save-qtype').addEventListener('click', async () => {
+  const input = document.getElementById('f-new-qtype');
+  const msgEl = document.getElementById('add-item-msg');
+  try {
+    const t = await saveQtype(input.value);
+    if (!t) return;
+    fillQtypeSelect(document.getElementById('f-qtype'));
+    document.getElementById('f-qtype').value = String(t.id);
+    document.getElementById('f-new-qtype-row').hidden = true;
+    input.value = '';
+    msgEl.textContent = '✓ unit added: ' + t.name; msgEl.className = 'ok';
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
+    msgEl.textContent = 'could not add unit: ' + e.message; msgEl.className = 'err';
+  }
+});
+
+document.getElementById('manage-list').addEventListener('change', e => {
+  if (e.target.dataset.act !== 'toggle-hidden') return;
+  const id = Number(e.target.dataset.id);
+  setHidden(id, !e.target.checked);
+});
+
+const listEl = document.getElementById('list');
+listEl.addEventListener('click', e => {
+  const row = e.target.closest('.card');
+  if (!row) return;
+  const id = Number(row.dataset.id);
+
+  if (e.target.dataset.act === 'undo') { undoClick(id); return; }
+  if (e.target.dataset.act === 'save') { saveItem(id, row); return; }
+  if (e.target.dataset.act === 'hide') { hideItem(id); return; }
+  if (e.target.dataset.act === 'save-qtype') {
+    const nameInput = row.querySelector('.e-new-qtype');
+    saveQtype(nameInput.value).then(t => {
+      if (!t) return;
+      const sel = row.querySelector('.e-qtype');
+      fillQtypeSelect2(sel, t.id);
+      row.querySelector('.e-new-qtype-row').hidden = true;
+      nameInput.value = '';
+    }).catch(err => {
+      if (err.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
+      setEditMsg(row, 'could not add unit: ' + err.message, 'err');
+    });
+    return;
+  }
+  if (e.target.closest('.edit-panel')) return; // clicks inside the form don't toggle/log
+
+  if (editMode) {
+    if (expandedEdit.has(id)) expandedEdit.delete(id); else expandedEdit.add(id);
+    render();
+  } else {
+    logClick(id);
+  }
+});
+listEl.addEventListener('change', e => {
+  if (!e.target.classList.contains('e-qtype')) return;
+  const row = e.target.closest('.card');
+  row.querySelector('.e-new-qtype-row').hidden = e.target.value !== '__new';
+  if (e.target.value === '__new') row.querySelector('.e-new-qtype').focus();
+});
+
+function fillQtypeSelect2(sel, selectId) {
+  sel.innerHTML = qtypeOptions(selectId);
+}
+
+document.getElementById('login-btn').addEventListener('click', sendLink);
+document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') sendLink(); });
+document.getElementById('signout').addEventListener('click', () => { NAuth.signOut(); location.reload(); });
+
+/* ---------- start ---------- */
+
+(async function init() {
+  const hashError = NAuth.consumeHash();
+  if (!NAuth.hasSession()) {
+    showLogin(hashError ? 'sign-in failed: ' + hashError : '', hashError ? 'err' : '');
+    return;
+  }
+  try { await NAuth.getToken(); } catch (e) { showLogin('session expired — request a new link.', 'err'); return; }
+
+  document.getElementById('wrap').hidden = false;
+  document.getElementById('list').innerHTML = '<div id="loading">loading…</div>';
+  try {
+    const [qtypeRows, itemRows, logRows] = await Promise.all([
+      NAuth.rest('clicker', 'quantity_types?select=id,name&order=name'),
+      NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden&order=created_at'),
+      NAuth.rest('clicker', 'logs?select=item_id,quantity&logged_at=gte.' + encodeURIComponent(startOfTodayIso())),
+    ]);
+    qtypes = qtypeRows;
+    items = itemRows;
+    for (const l of logRows) todayTotals[l.item_id] = (todayTotals[l.item_id] || 0) + Number(l.quantity);
+    render();
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
+    document.getElementById('list').innerHTML = `<div id="empty">failed to load: ${escapeHtml(e.message)}</div>`;
+  }
+})();
+</script>
+
+</body>
+</html>
