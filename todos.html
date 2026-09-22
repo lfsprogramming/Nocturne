@@ -58,9 +58,15 @@
   color: var(--text-dim); text-transform: uppercase; cursor: pointer; user-select: none;
 }
 .tick input { width: 22px; height: 22px; accent-color: var(--text); margin-bottom: 3px; cursor: pointer; }
-.tick.cancel { opacity: 0.6; }
 .main { flex: 1; min-width: 0; padding: 0.3rem 0; }
+.name-line { display: flex; align-items: center; gap: 0.5rem; }
+.chev { background: none; border: none; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 13px; cursor: pointer; padding: 0 2px; line-height: 1; }
+.chev:hover { color: var(--gold); }
 .name { font-size: 18px; line-height: 1.3; color: var(--text); }
+.details { margin-top: 0.35rem; }
+.actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.4rem; }
+.cancel-inline { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.cancel-inline input { accent-color: var(--text); cursor: pointer; }
 .meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--text-dim); margin-top: 2px; }
 .pri { cursor: pointer; border-bottom: 1px dotted var(--text-faint); }
 .pri:hover { color: var(--gold); border-bottom-color: var(--gold-dim); }
@@ -149,6 +155,7 @@
         <label><input type="radio" name="sort" value="reviewed">least recently reviewed</label>
       </div>
       <div class="opt-group">
+        <label><input type="checkbox" id="limit5" checked>top 5 only</label>
         <label><input type="checkbox" id="show-closed">show closed</label>
       </div>
     </div>
@@ -194,6 +201,7 @@ let categories = [];
 const recent = new Map();     // id -> timer; items just closed stay visible with an undo button
 const busy = new Set();       // ids with a save in flight
 let editingPriority = null;   // id of the row whose priority is being edited inline, or null
+const expanded = new Set();   // ids of rows currently expanded (per-row, resets on reload)
 
 /* ---------- helpers ---------- */
 
@@ -261,6 +269,7 @@ function numNullsFirst(a, b) {              // ascending, nulls first (never-rev
 function sortedVisible() {
   const cat = document.getElementById('cat-select').value;
   const showClosed = document.getElementById('show-closed').checked;
+  const limit5 = document.getElementById('limit5').checked;
   const mode = document.querySelector('input[name="sort"]:checked').value;
 
   let rows = items.filter(i => showClosed || i.status === 'open' || recent.has(i.id));
@@ -281,12 +290,14 @@ function sortedVisible() {
                      : num(dl(a), dl(b));
     return secondary || byCreated(a, b);
   });
+  if (limit5) rows = rows.slice(0, 5);
   return rows;
 }
 
 function rowHtml(i) {
   const closed = i.status !== 'open';
   const editingThis = editingPriority === i.id;
+  const isExp = expanded.has(i.id);
   const pre = [i.category ? i.category.name : ''].filter(Boolean).map(escapeHtml).join(' · ');
   const post = [i.deadline ? 'due ' + fmtDate(i.deadline) : '', reviewedText(i.reviewed_on)].filter(Boolean).map(escapeHtml).join(' · ');
   const pri = editingThis
@@ -294,16 +305,26 @@ function rowHtml(i) {
     : `<span class="pri" data-act="edit-priority">★ ${i.priority_score != null ? escapeHtml(String(Number(i.priority_score))) : '—'}</span>`;
   const badge = !closed && i.deadline ? deadlineBadge(i.deadline) : '';
   const undo = recent.has(i.id) ? `<button class="undo" data-act="undo">undo</button>` : '';
-  const reviewBtn = `<button class="review-btn" data-act="review" title="mark reviewed today">✓</button>`;
+  const reviewBtn = `<button class="review-btn" data-act="review" title="mark reviewed today">✓ reviewed</button>`;
+  const details = isExp ? `
+      <div class="details">
+        <div class="meta">${pre ? pre + ' · ' : ''}${pri}${post ? ' · ' + post : ''}${badge}</div>
+        ${i.description ? `<div class="notes">${escapeHtml(i.description)}</div>` : ''}
+        <div class="actions">
+          <label class="cancel-inline"><input type="checkbox" data-act="cancelled"${i.status === 'cancelled' ? ' checked' : ''}>cancel</label>
+          ${reviewBtn}
+          ${undo}
+        </div>
+      </div>` : '';
   return `
   <div class="row${closed ? ' closed' : ''}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}">
     <label class="tick"><input type="checkbox" data-act="done"${i.status === 'done' ? ' checked' : ''}>done</label>
     <div class="main">
-      <div class="name">${escapeHtml(i.title)}${reviewBtn}${undo}</div>
-      <div class="meta">${pre ? pre + ' · ' : ''}${pri}${post ? ' · ' + post : ''}${badge}</div>
-      ${i.description ? `<div class="notes">${escapeHtml(i.description)}</div>` : ''}
+      <div class="name-line">
+        <button class="chev" data-act="toggle" aria-expanded="${isExp}" title="${isExp ? 'collapse' : 'expand'}">${isExp ? '⌄' : '‹'}</button>
+        <span class="name">${escapeHtml(i.title)}</span>
+      </div>${details}
     </div>
-    <label class="tick cancel"><input type="checkbox" data-act="cancelled"${i.status === 'cancelled' ? ' checked' : ''}>cancel</label>
   </div>`;
 }
 
@@ -586,6 +607,12 @@ listEl.addEventListener('change', e => {
   changeStatus(id, e.target.checked ? act : 'open');
 });
 listEl.addEventListener('click', e => {
+  if (e.target.dataset && e.target.dataset.act === 'toggle') {
+    const id = Number(e.target.closest('.row').dataset.id);
+    if (expanded.has(id)) { expanded.delete(id); if (editingPriority === id) editingPriority = null; }
+    else expanded.add(id);
+    render();
+  }
   if (e.target.dataset && e.target.dataset.act === 'undo') {
     changeStatus(Number(e.target.closest('.row').dataset.id), 'open');
   }
@@ -629,6 +656,10 @@ document.getElementById('f-category').addEventListener('change', e => {
 
 document.getElementById('cat-select').addEventListener('change', render);
 document.getElementById('show-closed').addEventListener('change', render);
+document.getElementById('limit5').addEventListener('change', e => {
+  setPref('limit5', e.target.checked ? '1' : '0');
+  render();
+});
 document.querySelectorAll('input[name="sort"]').forEach(el => el.addEventListener('change', () => {
   setPref('sort', el.value);
   render();
@@ -652,6 +683,7 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
   const saved = getPref('sort', 'priority');
   const radio = document.querySelector(`input[name="sort"][value="${saved}"]`);
   if (radio) radio.checked = true;
+  document.getElementById('limit5').checked = getPref('limit5', '1') !== '0';
 
   listEl.innerHTML = '<div id="loading">loading…</div>';
   try {
