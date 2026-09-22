@@ -143,6 +143,27 @@
   letter-spacing: 0.06em;
 }
 
+/* add title */
+#add-panel { border: 0.5px solid var(--border); background: var(--bg-card); padding: 0.9rem; margin-bottom: 0.8rem; }
+#add-panel > * + * { margin-top: 0.6rem; }
+#add-panel input[type="text"], #add-panel select {
+  width: 100%;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  padding: 9px 10px;
+  color-scheme: dark;
+}
+#add-panel input::placeholder { color: var(--text-faint); }
+.field-row { display: flex; gap: 0.6rem; }
+.field-row > * { flex: 1; min-width: 0; }
+.form-buttons { display: flex; gap: 0.6rem; }
+#add-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); min-height: 1.3em; line-height: 1.5; }
+#add-msg.err { color: #d0645c; }
+#add-msg.ok { color: var(--teal); }
+
 /* login */
 #login { max-width: 420px; margin: 2rem auto; }
 #login p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; margin-bottom: 1rem; line-height: 1.7; }
@@ -204,10 +225,28 @@
     </div>
 
     <div id="edit-bar">
+      <button class="btn" id="add-toggle">+ add title</button>
       <button class="btn" id="save-btn" disabled>save</button>
       <button class="btn" id="cancel-btn" disabled>cancel</button>
       <span id="status"></span>
       <button id="signout">sign out</button>
+    </div>
+
+    <div id="add-panel" hidden>
+      <input type="text" id="a-title" placeholder="title" maxlength="300" autocomplete="off">
+      <div class="field-row">
+        <select id="a-type" aria-label="type"><option value="">type (optional)</option></select>
+        <input type="text" id="a-score" inputmode="decimal" placeholder="interest score" autocomplete="off">
+      </div>
+      <div class="field-row">
+        <label class="cell flag"><input type="checkbox" id="a-mkv">MKV</label>
+        <label class="cell flag"><input type="checkbox" id="a-jf">MP4 (Jellyfin)</label>
+      </div>
+      <div id="add-msg"></div>
+      <div class="form-buttons">
+        <button class="btn" id="add-title-btn">add</button>
+        <button class="btn" id="add-close">close</button>
+      </div>
     </div>
 
     <div id="media-list"></div>
@@ -351,6 +390,31 @@ async function patchRow(id, fields, token) {
   }
 }
 
+// Inserts one new title row as the signed-in user. RLS silently inserts nothing when a
+// write isn't allowed, so an empty reply is a failure, same as patchRow.
+async function insertRow(fields, token) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/titles', {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + token,
+      'Content-Profile': 'media',
+      'Accept-Profile': 'media',
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); msg = j.message || j.msg || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+  return rows[0];
+}
+
 let mediaTypes = [];
 let allTitles = [];
 let byId = new Map();
@@ -364,11 +428,101 @@ async function loadTypes() {
     opt.textContent = t.name;
     select.appendChild(opt);
   }
+  fillAddTypeSelect();
 }
 
 async function loadAllTitles() {
   allTitles = await sbFetch('titles?select=id,title,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
+}
+
+/* ---------- adding a title ---------- */
+
+let adding = false;
+let dupConfirmed = false;
+
+function setAddMsg(text, kind) {
+  const el = document.getElementById('add-msg');
+  el.textContent = text;
+  el.className = kind || '';
+}
+
+function fillAddTypeSelect() {
+  const sel = document.getElementById('a-type');
+  sel.innerHTML = '<option value="">type (optional)</option>'
+    + mediaTypes.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+}
+
+function norm(s) {
+  return s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^the /, '');
+}
+
+// Titles alias easily ("the", punctuation, one name inside another), so warn before adding a near-duplicate.
+function similarTitles(name) {
+  const n = norm(name);
+  if (!n) return [];
+  return allTitles.filter(r => {
+    const m = norm(r.title);
+    return m === n || (n.length >= 4 && m.length >= 4 && (m.includes(n) || n.includes(m)));
+  });
+}
+
+function resetAddForm() {
+  document.getElementById('a-title').value = '';
+  document.getElementById('a-score').value = '';
+  document.getElementById('a-type').value = '';
+  document.getElementById('a-mkv').checked = false;
+  document.getElementById('a-jf').checked = false;
+  dupConfirmed = false;
+  document.getElementById('add-title-btn').textContent = 'add';
+}
+
+async function addTitle() {
+  if (adding) return;
+  const name = document.getElementById('a-title').value.trim();
+  const scoreText = document.getElementById('a-score').value.trim();
+  const problems = [];
+  if (!name) problems.push('title is required');
+  const parsed = parseScore(scoreText);
+  if (!parsed.ok) problems.push('interest score must be a number like 3 or 4.5');
+  if (problems.length) { setAddMsg(problems.join('; '), 'err'); return; }
+
+  const dups = similarTitles(name);
+  if (dups.length && !dupConfirmed) {
+    dupConfirmed = true;
+    document.getElementById('add-title-btn').textContent = 'add anyway';
+    setAddMsg('already on the list: ' + dups.slice(0, 5).map(d => d.title).join(', ')
+      + (dups.length > 5 ? ', …' : '') + ' — press "add anyway" to add it regardless', 'err');
+    return;
+  }
+
+  const fields = {
+    title: name,
+    has_mkv: document.getElementById('a-mkv').checked,
+    in_jellyfin: document.getElementById('a-jf').checked,
+  };
+  if (parsed.value != null) fields.interest_score = parsed.value;
+  const typeId = document.getElementById('a-type').value;
+  if (typeId) fields.media_type_id = Number(typeId);
+
+  adding = true;
+  document.getElementById('add-title-btn').disabled = true;
+  setAddMsg('adding…');
+  try {
+    const token = await getToken();
+    await insertRow(fields, token);
+    await loadAllTitles();   // re-run the query so the row lands in its real sort position
+    resetAddForm();
+    render();
+    setAddMsg('');
+    setStatus('✓ added: ' + name, 'ok');
+    document.getElementById('a-title').focus();
+  } catch (e) {
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setAddMsg('could not add: ' + e.message, 'err');
+  }
+  adding = false;
+  document.getElementById('add-title-btn').disabled = false;
 }
 
 /* ---------- edit state ---------- */
@@ -579,6 +733,18 @@ listEl.addEventListener('focusin', e => { if (e.target.classList.contains('score
 
 document.getElementById('save-btn').addEventListener('click', saveEdits);
 document.getElementById('cancel-btn').addEventListener('click', cancelEdits);
+document.getElementById('add-toggle').addEventListener('click', () => {
+  const panel = document.getElementById('add-panel');
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) document.getElementById('a-title').focus();
+});
+document.getElementById('add-close').addEventListener('click', () => { document.getElementById('add-panel').hidden = true; });
+document.getElementById('add-title-btn').addEventListener('click', addTitle);
+document.getElementById('a-title').addEventListener('input', () => {
+  dupConfirmed = false;
+  document.getElementById('add-title-btn').textContent = 'add';
+});
+document.getElementById('a-title').addEventListener('keydown', e => { if (e.key === 'Enter') addTitle(); });
 document.getElementById('login-btn').addEventListener('click', sendLink);
 document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') sendLink(); });
 document.getElementById('signout').addEventListener('click', () => {
