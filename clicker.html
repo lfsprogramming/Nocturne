@@ -38,6 +38,9 @@
   transition: background 0.08s, border-color 0.15s;
 }
 .card:active { background: #16162a; }
+.card.colored:active { filter: brightness(1.25); }
+.card.light-bg .c-name { color: #16161c; }
+.card.light-bg .c-tally, .card.light-bg .c-sub { color: #3a3a46; }
 .card.flash { border-color: var(--gold); }
 .card.edit-mode { border-color: var(--gold-dim); }
 .card.busy { opacity: 0.5; pointer-events: none; }
@@ -59,6 +62,11 @@
   padding: 8px 9px;
   color-scheme: dark;
 }
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.swatch { width: 30px; height: 30px; padding: 0; border: 0.5px solid var(--border); cursor: pointer; }
+.swatch.none { background: linear-gradient(135deg, var(--bg) 46%, #d0645c 46%, #d0645c 54%, var(--bg) 54%); }
+.swatch.sel { outline: 2px solid var(--gold); outline-offset: 2px; }
+.edit-panel input.e-color-custom { width: 30px; height: 30px; padding: 0; border: 0.5px solid var(--border); background: none; cursor: pointer; }
 .field-row { display: flex; gap: 0.6rem; }
 .field-row > * { flex: 1; min-width: 0; }
 .edit-actions { display: flex; gap: 0.6rem; }
@@ -150,6 +158,9 @@
 
 <script>
 const UNDO_MS = 5000;
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+// muted presets that keep the default light text readable on the dark theme
+const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#45261f', '#3d1f2c', '#2e2e34'];
 
 let items = [];
 let qtypes = [];
@@ -184,6 +195,40 @@ function qtypeName(id) {
   return t ? t.name : '';
 }
 
+/* ---------- card colors ---------- */
+
+function isLightColor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55;
+}
+
+// class + style attributes for a card; color is re-validated here because it lands in markup
+function colorAttrs(color) {
+  if (!color || !COLOR_RE.test(color)) return { cls: '', style: '' };
+  return { cls: ' colored' + (isLightColor(color) ? ' light-bg' : ''), style: ` style="background:${color}"` };
+}
+
+// preview a color on an open edit row without re-rendering (which would drop unsaved form input)
+function applyRowColor(row, color) {
+  row.dataset.color = color || '';
+  row.style.background = color || '';
+  row.classList.toggle('colored', !!color);
+  row.classList.toggle('light-bg', !!color && isLightColor(color));
+  for (const s of row.querySelectorAll('.swatch')) s.classList.toggle('sel', (s.dataset.color || '') === (color || ''));
+  if (color) row.querySelector('.e-color-custom').value = color;
+}
+
+function swatchesHtml(current) {
+  const cur = current || '';
+  let html = `<button class="swatch none${cur ? '' : ' sel'}" data-act="color" data-color="" title="no color" aria-label="no color"></button>`;
+  for (const c of PRESET_COLORS) {
+    html += `<button class="swatch${c === cur ? ' sel' : ''}" data-act="color" data-color="${c}" style="background:${c}" aria-label="color ${c}"></button>`;
+  }
+  html += `<input type="color" class="e-color-custom" value="${cur || '#2a1f3d'}" title="custom color" aria-label="custom color">`;
+  return `<div class="swatches">${html}</div>`;
+}
+
 /* ---------- rendering ---------- */
 
 function render() {
@@ -209,10 +254,11 @@ function cardHtml(i) {
   const unit = i.quantity_type_id ? ' ' + escapeHtml(qtypeName(i.quantity_type_id)) : '';
   const rec = recent.get(i.id);
   const undo = rec ? `<button class="c-undo" data-act="undo">undo</button>` : '';
+  const col = colorAttrs(i.color);
 
   if (!editMode) {
     return `
-    <div class="card${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log">
+    <div class="card${col.cls}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log"${col.style}>
       <div class="card-top">
         <span class="c-name">${escapeHtml(i.name)}</span>
         <span class="c-tally">${total}${unit} today${undo}</span>
@@ -233,6 +279,7 @@ function cardHtml(i) {
           <input type="text" class="e-new-qtype" placeholder="new unit, e.g. rep" maxlength="40">
           <button class="btn" data-act="save-qtype">save unit</button>
         </div>
+        ${swatchesHtml(i.color)}
         <div class="edit-actions">
           <button class="btn" data-act="save">save</button>
           <button class="btn hide-btn" data-act="hide">hide</button>
@@ -240,7 +287,7 @@ function cardHtml(i) {
         <div class="edit-msg"></div>
       </div>` : '';
   return `
-    <div class="card edit-mode${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="edit-toggle-row">
+    <div class="card edit-mode${col.cls}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="edit-toggle-row" data-color="${i.color && COLOR_RE.test(i.color) ? i.color : ''}"${col.style}>
       <div class="card-top">
         <span class="c-name">${escapeHtml(i.name)}</span>
         <span class="c-tally">${sub}</span>
@@ -357,13 +404,16 @@ async function saveItem(id, row) {
   const name = row.querySelector('.e-name').value.trim();
   const qtyRaw = row.querySelector('.e-qty').value.trim();
   const qtypeSel = row.querySelector('.e-qtype').value;
+  const color = row.dataset.color || null;
   if (!name) { setEditMsg(row, 'name is required', 'err'); return; }
+  if (color && !COLOR_RE.test(color)) { setEditMsg(row, 'invalid color', 'err'); return; }
   if (qtypeSel === '__new') { setEditMsg(row, 'save or clear the new unit first', 'err'); return; }
   if (qtyRaw && !/^\d{1,6}(\.\d+)?$/.test(qtyRaw)) { setEditMsg(row, 'quantity must be a number', 'err'); return; }
   const body = {
     name,
     quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
     quantity_type_id: qtypeSel ? Number(qtypeSel) : null,
+    color,
   };
   busy.add(id);
   render();
@@ -455,7 +505,7 @@ async function addItem() {
   };
   setMsg('adding…');
   try {
-    const rows = await NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden',
+    const rows = await NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color',
       { method: 'POST', body, prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
     items.push(rows[0]);
@@ -559,6 +609,7 @@ listEl.addEventListener('click', e => {
   if (e.target.dataset.act === 'undo') { undoClick(id); return; }
   if (e.target.dataset.act === 'save') { saveItem(id, row); return; }
   if (e.target.dataset.act === 'hide') { hideItem(id); return; }
+  if (e.target.dataset.act === 'color') { applyRowColor(row, e.target.dataset.color); return; }
   if (e.target.dataset.act === 'save-qtype') {
     const nameInput = row.querySelector('.e-new-qtype');
     saveQtype(nameInput.value).then(t => {
@@ -589,6 +640,11 @@ listEl.addEventListener('change', e => {
   if (e.target.value === '__new') row.querySelector('.e-new-qtype').focus();
 });
 
+listEl.addEventListener('input', e => {
+  if (!e.target.classList.contains('e-color-custom')) return;
+  applyRowColor(e.target.closest('.card'), e.target.value);
+});
+
 function fillQtypeSelect2(sel, selectId) {
   sel.innerHTML = qtypeOptions(selectId);
 }
@@ -612,7 +668,7 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
   try {
     const [qtypeRows, itemRows, logRows] = await Promise.all([
       NAuth.rest('clicker', 'quantity_types?select=id,name&order=name'),
-      NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden&order=created_at'),
+      NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color&order=created_at'),
       NAuth.rest('clicker', 'logs?select=item_id,quantity&logged_at=gte.' + encodeURIComponent(startOfTodayIso())),
     ]);
     qtypes = qtypeRows;
