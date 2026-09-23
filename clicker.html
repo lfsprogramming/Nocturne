@@ -27,6 +27,9 @@
 .btn.on { color: var(--bg); background: var(--gold); }
 #plus-btn { font-size: 16px; line-height: 1; padding: 7px 14px; }
 
+#filters { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; }
+#filters .btn { flex: 1; padding: 7px 4px; font-size: 11px; }
+
 #list { display: flex; flex-direction: column; gap: 0.6rem; }
 .card {
   border: 0.5px solid var(--border);
@@ -140,6 +143,7 @@
           <input type="text" id="f-qty" inputmode="decimal" placeholder="quantity per click (default 1)" autocomplete="off">
           <select id="f-qtype" aria-label="quantity type"><option value="">no unit</option></select>
         </div>
+        <select id="f-cat" aria-label="category"></select>
         <div class="field-row" id="f-new-qtype-row" hidden>
           <input type="text" id="f-new-qtype" placeholder="new unit, e.g. rep" maxlength="40" autocomplete="off">
           <button class="btn" id="save-qtype">save unit</button>
@@ -148,6 +152,8 @@
         <button class="btn" id="add-item-btn">add item</button>
       </div>
     </div>
+
+    <div id="filters"></div>
 
     <div id="list"></div>
   </div>
@@ -164,6 +170,10 @@ const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#
 
 let items = [];
 let qtypes = [];
+let categories = [];          // ordered by sort_order; items with no category count as "other"
+const FILTER_KEY = 'clicker.filter';
+let filter = 'all';           // 'all' or a category id (as a string)
+try { filter = localStorage.getItem(FILTER_KEY) || 'all'; } catch (e) {}
 const todayTotals = {};       // item id -> number logged today
 const recent = new Map();     // item id -> { stack: [{ logId, qty }], timer } — every tap within the undo window, newest last
 const busy = new Set();       // item ids with a click save in flight
@@ -193,6 +203,25 @@ function startOfTodayIso() {
 function qtypeName(id) {
   const t = qtypes.find(q => q.id === id);
   return t ? t.name : '';
+}
+
+function otherCategoryId() {
+  const c = categories.find(c => c.name === 'other');
+  return c ? c.id : null;
+}
+
+// uncategorized items belong to "other", so nothing can fall outside every filter
+function effectiveCategory(i) {
+  return i.category_id != null ? i.category_id : otherCategoryId();
+}
+
+function matchesFilter(i) {
+  return filter === 'all' || String(effectiveCategory(i)) === filter;
+}
+
+function categoryOptions(selectedId) {
+  return categories.map(c =>
+    `<option value="${c.id}"${c.id === selectedId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 }
 
 /* ---------- card colors ---------- */
@@ -233,6 +262,7 @@ function swatchesHtml(current) {
 
 function render() {
   renderBar();
+  renderFilters();
   renderList();
   renderManagePanel();
 }
@@ -246,6 +276,12 @@ function renderBar() {
     managePanelOpen = false;
     document.getElementById('manage-panel').hidden = true;
   }
+}
+
+function renderFilters() {
+  const opts = [{ key: 'all', label: 'all' }, ...categories.map(c => ({ key: String(c.id), label: c.name }))];
+  document.getElementById('filters').innerHTML = opts.map(o =>
+    `<button class="btn${o.key === filter ? ' on' : ''}" data-filter="${o.key}">${escapeHtml(o.label)}</button>`).join('');
 }
 
 function cardHtml(i) {
@@ -275,6 +311,7 @@ function cardHtml(i) {
           <input type="text" class="e-qty" inputmode="decimal" placeholder="quantity per click" value="${escapeHtml(String(perClick))}">
           <select class="e-qtype">${qtypeOptions(i.quantity_type_id)}</select>
         </div>
+        <select class="e-cat" aria-label="category">${categoryOptions(effectiveCategory(i))}</select>
         <div class="field-row e-new-qtype-row" hidden>
           <input type="text" class="e-new-qtype" placeholder="new unit, e.g. rep" maxlength="40">
           <button class="btn" data-act="save-qtype">save unit</button>
@@ -307,9 +344,12 @@ function qtypeOptions(selectedId) {
 
 function renderList() {
   const listEl = document.getElementById('list');
-  const visible = items.filter(i => !i.hidden);
+  const visible = items.filter(i => !i.hidden && matchesFilter(i));
   if (!visible.length) {
-    listEl.innerHTML = `<div id="empty">nothing here yet. tap "edit" then "+" to add an item.</div>`;
+    const cat = categories.find(c => String(c.id) === filter);
+    listEl.innerHTML = cat
+      ? `<div id="empty">nothing in "${escapeHtml(cat.name)}" yet.</div>`
+      : `<div id="empty">nothing here yet. tap "edit" then "+" to add an item.</div>`;
     return;
   }
   listEl.innerHTML = visible.map(cardHtml).join('');
@@ -330,6 +370,12 @@ function renderManagePanel() {
   const prevVal = sel.value;
   fillQtypeSelect(sel);
   if ([...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
+  const catSel = document.getElementById('f-cat');
+  const prevCat = catSel.value;
+  catSel.innerHTML = categoryOptions(null);
+  // keep what the user picked; otherwise default to the category being viewed, else "other"
+  catSel.value = prevCat && categories.some(c => String(c.id) === prevCat) ? prevCat
+    : (filter !== 'all' ? filter : String(otherCategoryId()));
 }
 
 function fillQtypeSelect(sel) {
@@ -414,6 +460,7 @@ async function saveItem(id, row) {
   const qtyRaw = row.querySelector('.e-qty').value.trim();
   const qtypeSel = row.querySelector('.e-qtype').value;
   const color = row.dataset.color || null;
+  const catSel = row.querySelector('.e-cat').value;
   if (!name) { setEditMsg(row, 'name is required', 'err'); return; }
   if (color && !COLOR_RE.test(color)) { setEditMsg(row, 'invalid color', 'err'); return; }
   if (qtypeSel === '__new') { setEditMsg(row, 'save or clear the new unit first', 'err'); return; }
@@ -423,6 +470,7 @@ async function saveItem(id, row) {
     quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
     quantity_type_id: qtypeSel ? Number(qtypeSel) : null,
     color,
+    category_id: catSel ? Number(catSel) : null,
   };
   busy.add(id);
   render();
@@ -500,6 +548,7 @@ async function addItem() {
   const name = document.getElementById('f-name').value.trim();
   const qtyRaw = document.getElementById('f-qty').value.trim();
   const qtypeSel = document.getElementById('f-qtype').value;
+  const catSel = document.getElementById('f-cat').value;
   const msgEl = document.getElementById('add-item-msg');
   const setMsg = (t, k) => { msgEl.textContent = t; msgEl.className = k || ''; };
 
@@ -511,16 +560,18 @@ async function addItem() {
     name,
     quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
     quantity_type_id: qtypeSel ? Number(qtypeSel) : null,
+    category_id: catSel ? Number(catSel) : null,
   };
   setMsg('adding…');
   try {
-    const rows = await NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color',
+    const rows = await NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color,category_id',
       { method: 'POST', body, prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
     items.push(rows[0]);
     document.getElementById('f-name').value = '';
     document.getElementById('f-qty').value = '';
     document.getElementById('f-qtype').value = '';
+    document.getElementById('f-cat').value = '';
     document.getElementById('f-new-qtype-row').hidden = true;
     setMsg('✓ added: ' + name, 'ok');
     addingItemOpen = false;
@@ -574,6 +625,7 @@ document.getElementById('plus-btn').addEventListener('click', () => {
 
 document.getElementById('add-item-toggle').addEventListener('click', () => {
   addingItemOpen = !addingItemOpen;
+  if (addingItemOpen) { document.getElementById('f-cat').value = ''; renderManagePanel(); }
   document.getElementById('add-item-panel').hidden = !addingItemOpen;
   if (addingItemOpen) document.getElementById('f-name').focus();
 });
@@ -601,6 +653,14 @@ document.getElementById('save-qtype').addEventListener('click', async () => {
     if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
     msgEl.textContent = 'could not add unit: ' + e.message; msgEl.className = 'err';
   }
+});
+
+document.getElementById('filters').addEventListener('click', e => {
+  const key = e.target.dataset.filter;
+  if (!key) return;
+  filter = key;
+  try { localStorage.setItem(FILTER_KEY, key); } catch (err) {}
+  render();
 });
 
 document.getElementById('manage-list').addEventListener('change', e => {
@@ -675,12 +735,15 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
   document.getElementById('wrap').hidden = false;
   document.getElementById('list').innerHTML = '<div id="loading">loading…</div>';
   try {
-    const [qtypeRows, itemRows, logRows] = await Promise.all([
+    const [qtypeRows, catRows, itemRows, logRows] = await Promise.all([
       NAuth.rest('clicker', 'quantity_types?select=id,name&order=name'),
-      NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color&order=created_at'),
+      NAuth.rest('clicker', 'categories?select=id,name&order=sort_order'),
+      NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color,category_id&order=created_at'),
       NAuth.rest('clicker', 'logs?select=item_id,quantity&logged_at=gte.' + encodeURIComponent(startOfTodayIso())),
     ]);
     qtypes = qtypeRows;
+    categories = catRows;
+    if (filter !== 'all' && !categories.some(c => String(c.id) === filter)) filter = 'all';
     items = itemRows;
     for (const l of logRows) todayTotals[l.item_id] = (todayTotals[l.item_id] || 0) + Number(l.quantity);
     render();
