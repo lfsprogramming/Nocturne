@@ -39,6 +39,7 @@
 }
 .media-row:last-child { border-bottom: none; }
 .media-row .m-title { color: var(--text); font-size: 17px; }
+.media-row .m-creator { color: var(--text-dim); font-size: 14px; }
 .media-row .m-score {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -114,7 +115,7 @@
     <select id="type-select">
       <option value="">All types</option>
     </select>
-    <input type="text" id="search-box" placeholder="search titles…">
+    <input type="text" id="search-box" placeholder="search titles or creators…">
 
     <div id="filters">
       <fieldset class="filter-group">
@@ -169,7 +170,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
 }
 
 function radioValue(name) {
@@ -185,7 +186,7 @@ function render() {
 
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
-  if (search) rows = rows.filter(r => r.title.toLowerCase().includes(search));
+  if (search) rows = rows.filter(r => r.title.toLowerCase().includes(search) || (r.creator || '').toLowerCase().includes(search));
   if (mkvFilter) rows = rows.filter(r => !!r.has_mkv === (mkvFilter === 'true'));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
@@ -197,7 +198,7 @@ function render() {
   listEl.innerHTML = rows.map(r => `
     <div class="media-row">
       <span class="m-score">${r.interest_score ?? '—'}</span>
-      <span class="m-title">${escapeHtml(r.title)}</span>
+      <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
     </div>
   `).join('');
 }
