@@ -564,7 +564,7 @@ async function saveItem(id, row) {
     reassess_days: reassessRaw ? Number(reassessRaw) : null,
   };
   // touching the reassess field restarts the countdown even if the number is unchanged;
-  // the server replaces this timestamp with its own clock (a quantity change restarts it server-side too)
+  // the server replaces this timestamp with its own clock (a quantity or daily limit change restarts it server-side too)
   if (row.dataset.restart === '1') body.countdown_since = new Date().toISOString();
   busy.add(id);
   render();
@@ -803,15 +803,16 @@ listEl.addEventListener('change', e => {
   if (e.target.value === '__new') row.querySelector('.e-new-qtype').focus();
 });
 
-// editing the reassess field, or changing the quantity per click, restarts the countdown on save — say so on the button
+// editing the reassess field, or changing the quantity per click or daily limit, restarts the countdown on save — say so on the button
 listEl.addEventListener('input', e => {
   const row = e.target.closest('.card');
   if (e.target.classList.contains('e-reassess')) row.dataset.restart = '1';
-  if (e.target.classList.contains('e-reassess') || e.target.classList.contains('e-qty')) {
+  if (e.target.matches('.e-reassess, .e-qty, .e-limit')) {
     const item = items.find(i => i.id === Number(row.dataset.id));
     const qtyChanged = row.querySelector('.e-qty').value.trim() !== String(Number(item.quantity_per_click));
+    const limitChanged = row.querySelector('.e-limit').value.trim() !== (item.daily_limit != null ? String(item.daily_limit) : '');
     row.querySelector('[data-act="save"]').textContent =
-      row.dataset.restart === '1' || qtyChanged ? 'save & restart countdown' : 'save';
+      row.dataset.restart === '1' || qtyChanged || limitChanged ? 'save & restart countdown' : 'save';
     return;
   }
   if (!e.target.classList.contains('e-color-custom')) return;
