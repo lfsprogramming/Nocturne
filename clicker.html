@@ -165,7 +165,7 @@ const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#
 let items = [];
 let qtypes = [];
 const todayTotals = {};       // item id -> number logged today
-const recent = new Map();     // item id -> { logId, qty, timer }
+const recent = new Map();     // item id -> { stack: [{ logId, qty }], timer } — every tap within the undo window, newest last
 const busy = new Set();       // item ids with a click save in flight
 let editMode = false;
 const expandedEdit = new Set(); // item ids showing their edit panel (edit mode only)
@@ -253,7 +253,7 @@ function cardHtml(i) {
   const total = todayTotals[i.id] || 0;
   const unit = i.quantity_type_id ? ' ' + escapeHtml(qtypeName(i.quantity_type_id)) : '';
   const rec = recent.get(i.id);
-  const undo = rec ? `<button class="c-undo" data-act="undo">undo</button>` : '';
+  const undo = rec ? `<button class="c-undo" data-act="undo">undo${rec.stack.length > 1 ? ' ×' + rec.stack.length : ''}</button>` : '';
   const col = colorAttrs(i.color);
 
   if (!editMode) {
@@ -358,10 +358,9 @@ async function logClick(id) {
     const rows = await NAuth.rest('clicker', 'logs?select=id,logged_at',
       { method: 'POST', body: { item_id: id, quantity: qty, quantity_type_id: item.quantity_type_id }, prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
-    const logId = rows[0].id;
-    clearTimeout((recent.get(id) || {}).timer);
-    const timer = setTimeout(() => { recent.delete(id); render(); }, UNDO_MS);
-    recent.set(id, { logId, qty, timer });
+    const rec = recent.get(id) || { stack: [] };
+    rec.stack.push({ logId: rows[0].id, qty });
+    armUndoTimer(id, rec);
     setStatus('✓ logged: ' + item.name, 'ok');
   } catch (e) {
     todayTotals[id] -= qty;
@@ -372,18 +371,28 @@ async function logClick(id) {
   render();
 }
 
+// (re)start the undo window; each tap or undo gives a fresh UNDO_MS
+function armUndoTimer(id, rec) {
+  clearTimeout(rec.timer);
+  rec.timer = setTimeout(() => { recent.delete(id); render(); }, UNDO_MS);
+  recent.set(id, rec);
+}
+
 async function undoClick(id) {
   const rec = recent.get(id);
   if (!rec || busy.has(id)) return;
   clearTimeout(rec.timer);
+  const last = rec.stack[rec.stack.length - 1];
   busy.add(id);
   render();
   try {
-    await NAuth.rest('clicker', 'logs?id=eq.' + encodeURIComponent(rec.logId), { method: 'DELETE' });
-    todayTotals[id] = Math.max(0, (todayTotals[id] || 0) - rec.qty);
-    recent.delete(id);
+    await NAuth.rest('clicker', 'logs?id=eq.' + encodeURIComponent(last.logId), { method: 'DELETE' });
+    todayTotals[id] = Math.max(0, (todayTotals[id] || 0) - last.qty);
+    rec.stack.pop();
+    if (rec.stack.length) armUndoTimer(id, rec); else recent.delete(id);
     setStatus('✓ undone', 'ok');
   } catch (e) {
+    if (recent.has(id)) armUndoTimer(id, rec);
     if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
     else setStatus('could not undo: ' + e.message, 'err');
   }
