@@ -49,6 +49,8 @@
 .card.busy { opacity: 0.5; pointer-events: none; }
 .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem; }
 .c-name { font-size: 19px; color: var(--text); }
+.c-per { margin-left: 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--text-dim); white-space: nowrap; }
+.card.light-bg .c-per { color: #3a3a46; }
 .c-tally { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.04em; color: var(--gold-dim); white-space: nowrap; }
 .c-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--text-dim); margin-top: 3px; }
 .c-undo { margin-left: 0.6rem; background: none; border: 0.5px solid var(--gold-dim); color: var(--gold); font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; padding: 1px 8px; cursor: pointer; }
@@ -293,10 +295,13 @@ function cardHtml(i) {
   const col = colorAttrs(i.color);
 
   if (!editMode) {
+    // what one tap is worth; skipped for a plain unitless 1, where it would only add noise
+    const qty = Number(i.quantity_per_click);
+    const per = (qty !== 1 || unit) ? `<span class="c-per">+${qty}${unit}</span>` : '';
     return `
     <div class="card${col.cls}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log"${col.style}>
       <div class="card-top">
-        <span class="c-name">${escapeHtml(i.name)}</span>
+        <span class="c-name">${escapeHtml(i.name)}${per}</span>
         <span class="c-tally">${total}${unit} today${undo}</span>
       </div>
     </div>`;
