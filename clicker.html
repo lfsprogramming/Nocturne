@@ -97,6 +97,15 @@
 #add-item-msg.err { color: #d0645c; }
 #add-item-msg.ok { color: var(--teal); }
 
+.card.done { opacity: 0.55; }
+.c-done { color: var(--teal); margin-right: 0.4rem; }
+#reassess { border: 0.5px solid var(--gold-dim); background: var(--bg-card); padding: 0.7rem 0.9rem; margin-bottom: 0.9rem; }
+#reassess .manage-title { margin-bottom: 0.35rem; }
+#reassess-list { font-size: 15px; color: var(--text); line-height: 1.6; }
+.e-label { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 3px; }
+.e-countdown { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); }
+.card.light-bg .e-label, .card.light-bg .e-countdown { color: #3a3a46; }
+
 #empty, #loading { padding: 1.5rem; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; line-height: 1.7; }
 [hidden] { display: none !important; }
 
@@ -155,6 +164,11 @@
       </div>
     </div>
 
+    <div id="reassess" hidden>
+      <div class="manage-title">ready to reassess</div>
+      <div id="reassess-list"></div>
+    </div>
+
     <div id="filters"></div>
 
     <div id="list"></div>
@@ -168,6 +182,7 @@
 const UNDO_MS = 5000;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 // muted presets that keep the default light text readable on the dark theme
+const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since';
 const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#45261f', '#3d1f2c', '#2e2e34'];
 
 let items = [];
@@ -177,6 +192,9 @@ const FILTER_KEY = 'clicker.filter';
 let filter = 'all';           // 'all' or a category id (as a string)
 try { filter = localStorage.getItem(FILTER_KEY) || 'all'; } catch (e) {}
 const todayTotals = {};       // item id -> number logged today
+// logs from today, plus every log since the countdown started for items with a reassess gate:
+// { id, item_id, logged_at }. Drives the "done for today" check and the countdown.
+let gateLogs = [];
 const recent = new Map();     // item id -> { stack: [{ logId, qty }], timer } — every tap within the undo window, newest last
 const busy = new Set();       // item ids with a click save in flight
 let editMode = false;
@@ -200,6 +218,43 @@ function startOfTodayIso() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
+}
+
+/* ---------- daily limit + reassess countdown ---------- */
+
+function localDayKey(d) {
+  return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+
+function tapsToday(id) {
+  const today = localDayKey(new Date());
+  return gateLogs.filter(l => l.item_id === id && localDayKey(new Date(l.logged_at)) === today).length;
+}
+
+// reaching the daily limit marks the item done; taps past it still log, they just don't count extra
+function isDoneToday(i) {
+  return i.daily_limit != null && tapsToday(i.id) >= i.daily_limit;
+}
+
+// days since the countdown started on which the full daily dose was reached (any tap, with no limit set)
+function fullDays(i) {
+  const since = new Date(i.countdown_since).getTime();
+  const perDay = {};
+  for (const l of gateLogs) {
+    if (l.item_id !== i.id || new Date(l.logged_at).getTime() < since) continue;
+    const k = localDayKey(new Date(l.logged_at));
+    perDay[k] = (perDay[k] || 0) + 1;
+  }
+  const need = i.daily_limit || 1;
+  return Object.values(perDay).filter(n => n >= need).length;
+}
+
+function daysLeft(i) {
+  return i.reassess_days == null ? null : Math.max(0, i.reassess_days - fullDays(i));
+}
+
+function isReadyToReassess(i) {
+  return i.reassess_days != null && daysLeft(i) === 0;
 }
 
 function qtypeName(id) {
@@ -264,6 +319,7 @@ function swatchesHtml(current) {
 
 function render() {
   renderBar();
+  renderReassess();
   renderFilters();
   renderList();
   renderManagePanel();
@@ -278,6 +334,14 @@ function renderBar() {
     managePanelOpen = false;
     document.getElementById('manage-panel').hidden = true;
   }
+}
+
+// shown regardless of the category filter; an entry clears once the quantity per click changes
+// or the countdown is restarted in edit mode
+function renderReassess() {
+  const ready = items.filter(i => !i.hidden && isReadyToReassess(i));
+  document.getElementById('reassess').hidden = !ready.length;
+  document.getElementById('reassess-list').innerHTML = ready.map(i => escapeHtml(i.name)).join('<br>');
 }
 
 function renderFilters() {
@@ -298,11 +362,12 @@ function cardHtml(i) {
     // what one tap is worth; skipped for a plain unitless 1, where it would only add noise
     const qty = Number(i.quantity_per_click);
     const per = (qty !== 1 || unit) ? `<span class="c-per">+${qty}${unit}</span>` : '';
+    const done = isDoneToday(i);
     return `
-    <div class="card${col.cls}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log"${col.style}>
+    <div class="card${col.cls}${done ? ' done' : ''}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log"${col.style}>
       <div class="card-top">
         <span class="c-name">${escapeHtml(i.name)}${per}</span>
-        <span class="c-tally">${total}${unit} today${undo}</span>
+        <span class="c-tally">${done ? '<span class="c-done">✓</span>' : ''}${total}${unit} today${undo}</span>
       </div>
     </div>`;
   }
@@ -321,6 +386,13 @@ function cardHtml(i) {
           <input type="text" class="e-new-qtype" placeholder="new unit, e.g. rep" maxlength="40">
           <button class="btn" data-act="save-qtype">save unit</button>
         </div>
+        <div class="field-row">
+          <label><span class="e-label">daily limit</span>
+            <input type="text" class="e-limit" inputmode="numeric" placeholder="none" value="${i.daily_limit != null ? i.daily_limit : ''}"></label>
+          <label><span class="e-label">reassess after (days)</span>
+            <input type="text" class="e-reassess" inputmode="numeric" placeholder="none" value="${i.reassess_days != null ? i.reassess_days : ''}"></label>
+        </div>
+        <div class="e-countdown">${countdownText(i)}</div>
         ${swatchesHtml(i.color)}
         <div class="edit-actions">
           <button class="btn" data-act="save">save</button>
@@ -336,6 +408,12 @@ function cardHtml(i) {
       </div>
       ${panel}
     </div>`;
+}
+
+function countdownText(i) {
+  if (i.reassess_days == null) return 'no reassess countdown';
+  const left = daysLeft(i);
+  return left === 0 ? 'ready to reassess' : `${left} day${left === 1 ? '' : 's'} left`;
 }
 
 function qtypeOptions(selectedId) {
@@ -411,6 +489,7 @@ async function logClick(id) {
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
     const rec = recent.get(id) || { stack: [] };
     rec.stack.push({ logId: rows[0].id, qty });
+    gateLogs.push({ id: rows[0].id, item_id: id, logged_at: rows[0].logged_at });
     armUndoTimer(id, rec);
     setStatus('✓ logged: ' + item.name, 'ok');
   } catch (e) {
@@ -439,6 +518,7 @@ async function undoClick(id) {
   try {
     await NAuth.rest('clicker', 'logs?id=eq.' + encodeURIComponent(last.logId), { method: 'DELETE' });
     todayTotals[id] = Math.max(0, (todayTotals[id] || 0) - last.qty);
+    gateLogs = gateLogs.filter(l => l.id !== last.logId);
     rec.stack.pop();
     if (rec.stack.length) armUndoTimer(id, rec); else recent.delete(id);
     setStatus('✓ undone', 'ok');
@@ -470,20 +550,29 @@ async function saveItem(id, row) {
   if (color && !COLOR_RE.test(color)) { setEditMsg(row, 'invalid color', 'err'); return; }
   if (qtypeSel === '__new') { setEditMsg(row, 'save or clear the new unit first', 'err'); return; }
   if (qtyRaw && !/^\d{1,6}(\.\d+)?$/.test(qtyRaw)) { setEditMsg(row, 'quantity must be a number', 'err'); return; }
+  const limitRaw = row.querySelector('.e-limit').value.trim();
+  const reassessRaw = row.querySelector('.e-reassess').value.trim();
+  if (limitRaw && !/^[1-9]\d{0,2}$/.test(limitRaw)) { setEditMsg(row, 'daily limit must be a whole number 1–999', 'err'); return; }
+  if (reassessRaw && !/^[1-9]\d{0,2}$/.test(reassessRaw)) { setEditMsg(row, 'reassess days must be a whole number 1–999', 'err'); return; }
   const body = {
     name,
     quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
     quantity_type_id: qtypeSel ? Number(qtypeSel) : null,
     color,
     category_id: catSel ? Number(catSel) : null,
+    daily_limit: limitRaw ? Number(limitRaw) : null,
+    reassess_days: reassessRaw ? Number(reassessRaw) : null,
   };
+  // touching the reassess field restarts the countdown even if the number is unchanged;
+  // the server replaces this timestamp with its own clock (a quantity change restarts it server-side too)
+  if (row.dataset.restart === '1') body.countdown_since = new Date().toISOString();
   busy.add(id);
   render();
   try {
-    const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id),
+    const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id) + '&select=' + ITEM_COLS,
       { method: 'PATCH', body, prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
-    Object.assign(item, body);
+    Object.assign(item, rows[0]);
     expandedEdit.delete(id);
     setStatus('✓ saved: ' + name, 'ok');
   } catch (e) {
@@ -569,7 +658,7 @@ async function addItem() {
   };
   setMsg('adding…');
   try {
-    const rows = await NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color,category_id',
+    const rows = await NAuth.rest('clicker', 'items?select=' + ITEM_COLS,
       { method: 'POST', body, prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
     items.push(rows[0]);
@@ -714,7 +803,17 @@ listEl.addEventListener('change', e => {
   if (e.target.value === '__new') row.querySelector('.e-new-qtype').focus();
 });
 
+// editing the reassess field, or changing the quantity per click, restarts the countdown on save — say so on the button
 listEl.addEventListener('input', e => {
+  const row = e.target.closest('.card');
+  if (e.target.classList.contains('e-reassess')) row.dataset.restart = '1';
+  if (e.target.classList.contains('e-reassess') || e.target.classList.contains('e-qty')) {
+    const item = items.find(i => i.id === Number(row.dataset.id));
+    const qtyChanged = row.querySelector('.e-qty').value.trim() !== String(Number(item.quantity_per_click));
+    row.querySelector('[data-act="save"]').textContent =
+      row.dataset.restart === '1' || qtyChanged ? 'save & restart countdown' : 'save';
+    return;
+  }
   if (!e.target.classList.contains('e-color-custom')) return;
   applyRowColor(e.target.closest('.card'), e.target.value);
 });
@@ -740,17 +839,26 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
   document.getElementById('wrap').hidden = false;
   document.getElementById('list').innerHTML = '<div id="loading">loading…</div>';
   try {
-    const [qtypeRows, catRows, itemRows, logRows] = await Promise.all([
+    const [qtypeRows, catRows, itemRows] = await Promise.all([
       NAuth.rest('clicker', 'quantity_types?select=id,name&order=name'),
       NAuth.rest('clicker', 'categories?select=id,name&order=sort_order'),
-      NAuth.rest('clicker', 'items?select=id,name,quantity_per_click,quantity_type_id,hidden,color,category_id&order=created_at'),
-      NAuth.rest('clicker', 'logs?select=item_id,quantity&logged_at=gte.' + encodeURIComponent(startOfTodayIso())),
+      NAuth.rest('clicker', 'items?select=' + ITEM_COLS + '&order=created_at'),
     ]);
     qtypes = qtypeRows;
     categories = catRows;
     if (filter !== 'all' && !categories.some(c => String(c.id) === filter)) filter = 'all';
     items = itemRows;
-    for (const l of logRows) todayTotals[l.item_id] = (todayTotals[l.item_id] || 0) + Number(l.quantity);
+    // all of today's logs, plus each gated item's own logs back to where its countdown started
+    const todayIso = startOfTodayIso();
+    const conds = [`logged_at.gte."${todayIso}"`];
+    for (const i of items) {
+      if (i.reassess_days != null) conds.push(`and(item_id.eq.${i.id},logged_at.gte."${new Date(i.countdown_since).toISOString()}")`);
+    }
+    const logRows = await NAuth.rest('clicker', 'logs?select=id,item_id,quantity,logged_at&order=logged_at&or=' + encodeURIComponent('(' + conds.join(',') + ')'));
+    gateLogs = logRows.map(l => ({ id: l.id, item_id: l.item_id, logged_at: l.logged_at }));
+    for (const l of logRows) {
+      if (new Date(l.logged_at) >= new Date(todayIso)) todayTotals[l.item_id] = (todayTotals[l.item_id] || 0) + Number(l.quantity);
+    }
     render();
   } catch (e) {
     if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
