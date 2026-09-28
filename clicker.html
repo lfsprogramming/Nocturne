@@ -387,7 +387,7 @@ function cardHtml(i) {
           <button class="btn" data-act="save-qtype">save unit</button>
         </div>
         <div class="field-row">
-          <label><span class="e-label">daily limit</span>
+          <label><span class="e-label">daily minimum</span>
             <input type="text" class="e-limit" inputmode="numeric" placeholder="none" value="${i.daily_limit != null ? i.daily_limit : ''}"></label>
           <label><span class="e-label">reassess after (days)</span>
             <input type="text" class="e-reassess" inputmode="numeric" placeholder="none" value="${i.reassess_days != null ? i.reassess_days : ''}"></label>
@@ -552,7 +552,7 @@ async function saveItem(id, row) {
   if (qtyRaw && !/^\d{1,6}(\.\d+)?$/.test(qtyRaw)) { setEditMsg(row, 'quantity must be a number', 'err'); return; }
   const limitRaw = row.querySelector('.e-limit').value.trim();
   const reassessRaw = row.querySelector('.e-reassess').value.trim();
-  if (limitRaw && !/^[1-9]\d{0,2}$/.test(limitRaw)) { setEditMsg(row, 'daily limit must be a whole number 1–999', 'err'); return; }
+  if (limitRaw && !/^[1-9]\d{0,2}$/.test(limitRaw)) { setEditMsg(row, 'daily minimum must be a whole number 1–999', 'err'); return; }
   if (reassessRaw && !/^[1-9]\d{0,2}$/.test(reassessRaw)) { setEditMsg(row, 'reassess days must be a whole number 1–999', 'err'); return; }
   const body = {
     name,
