@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Todos — Nocturne</title>
+<title>To-dos — Nocturne</title>
 <link rel="stylesheet" href="style.css">
 <style>
 #todo-wrap { max-width: 640px; margin: 0 auto; }
@@ -15,6 +15,18 @@
   align-items: center;
   margin-bottom: 1rem;
 }
+#search-box {
+  width: 100%;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  letter-spacing: 0.05em;
+  padding: 9px 12px;
+  margin-bottom: 0.8rem;
+}
+#search-box::placeholder { color: var(--text-faint); }
 #cat-select {
   background: var(--bg-card);
   border: 0.5px solid var(--border);
@@ -134,7 +146,7 @@
 <div class="page-wrap">
 
   <div class="page-header">
-    <h1>Todos</h1>
+    <h1>To-dos</h1>
     <p class="byline">what's still to do — private, needs login</p>
   </div>
 
@@ -146,6 +158,7 @@
   </div>
 
   <div id="todo-wrap" hidden>
+    <input type="search" id="search-box" placeholder="search titles, notes, categories…" autocomplete="off">
     <div id="controls">
       <select id="cat-select"><option value="">All categories</option></select>
       <div class="opt-group">
@@ -161,7 +174,7 @@
     </div>
 
     <div id="bar">
-      <button class="btn" id="add-toggle">+ add todo</button>
+      <button class="btn" id="add-toggle">+ add to-do</button>
       <span id="status"></span>
       <button id="signout">sign out</button>
     </div>
@@ -271,9 +284,12 @@ function sortedVisible() {
   const showClosed = document.getElementById('show-closed').checked;
   const limit5 = document.getElementById('limit5').checked;
   const mode = document.querySelector('input[name="sort"]:checked').value;
+  const search = searchText();
 
   let rows = items.filter(i => showClosed || i.status === 'open' || recent.has(i.id));
   if (cat) rows = rows.filter(i => String(i.category_id) === cat);
+  if (search) rows = rows.filter(i =>
+    [i.title, i.description, i.category && i.category.name].some(s => (s || '').toLowerCase().includes(search)));
 
   const dl = i => (i.deadline ? new Date(i.deadline + 'T00:00:00').getTime() : null);
   const rv = i => (i.reviewed_on ? new Date(i.reviewed_on).getTime() : null);
@@ -290,8 +306,12 @@ function sortedVisible() {
                      : num(dl(a), dl(b));
     return secondary || byCreated(a, b);
   });
-  if (limit5) rows = rows.slice(0, 5);
+  if (limit5 && !search) rows = rows.slice(0, 5);   // a search shows every match, not just the top 5
   return rows;
+}
+
+function searchText() {
+  return document.getElementById('search-box').value.trim().toLowerCase();
 }
 
 function rowHtml(i) {
@@ -332,7 +352,9 @@ function render() {
   const listEl = document.getElementById('list');
   const rows = sortedVisible();
   if (!rows.length) {
-    listEl.innerHTML = '<div id="empty">nothing open right now.<br>new todos are added through Claude for now.</div>';
+    listEl.innerHTML = searchText()
+      ? '<div id="empty">no to-dos match that search.</div>'
+      : '<div id="empty">nothing open right now.</div>';
     return;
   }
   listEl.innerHTML = rows.map(rowHtml).join('');
@@ -654,6 +676,7 @@ document.getElementById('f-category').addEventListener('change', e => {
   if (isNew) document.getElementById('f-new-cat').focus();
 });
 
+document.getElementById('search-box').addEventListener('input', render);
 document.getElementById('cat-select').addEventListener('change', render);
 document.getElementById('show-closed').addEventListener('change', render);
 document.getElementById('limit5').addEventListener('change', e => {
