@@ -115,6 +115,7 @@
 }
 .media-row:last-child { border-bottom: none; }
 .media-row .m-title { color: var(--text); font-size: 17px; flex: 1 1 12rem; min-width: 0; }
+.media-row .m-creator { color: var(--text-dim); font-size: 14px; }
 .cell {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
@@ -207,7 +208,7 @@
     <select id="type-select">
       <option value="">All types</option>
     </select>
-    <input type="text" id="search-box" placeholder="search titles…">
+    <input type="text" id="search-box" placeholder="search titles or creators…">
 
     <div id="filters">
       <fieldset class="filter-group">
@@ -432,7 +433,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
 }
 
@@ -589,6 +590,10 @@ function radioValue(name) {
   return document.querySelector(`input[name="${name}"]:checked`).value;
 }
 
+function fold(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[‘’]/g, "'").toLowerCase();
+}
+
 function escapeHtml(s) {
   const div = document.createElement('div');
   div.textContent = s;
@@ -598,14 +603,14 @@ function escapeHtml(s) {
 function render() {
   const listEl = document.getElementById('media-list');
   const typeId = document.getElementById('type-select').value;
-  const search = document.getElementById('search-box').value.trim().toLowerCase();
+  const search = fold(document.getElementById('search-box').value.trim());
   const mkvFilter = radioValue('mkv-filter');
   const jfFilter = radioValue('jf-filter');
 
   // Filters look at the saved values, so a row doesn't vanish while you tick its box.
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
-  if (search) rows = rows.filter(r => r.title.toLowerCase().includes(search));
+  if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
   if (mkvFilter) rows = rows.filter(r => !!r.has_mkv === (mkvFilter === 'true'));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
@@ -624,7 +629,7 @@ function render() {
     <div class="media-row" data-id="${id}">
       <input class="cell score-in${'interest_score' in p ? ' changed' : ''}" data-field="interest_score"
              inputmode="decimal" placeholder="—" value="${score ?? ''}" aria-label="interest score">
-      <span class="m-title">${escapeHtml(r.title)}</span>
+      <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
       <label class="cell flag${'has_mkv' in p ? ' changed' : ''}"><input type="checkbox" data-field="has_mkv"${mkv ? ' checked' : ''}>MKV</label>
       <label class="cell flag${'in_jellyfin' in p ? ' changed' : ''}"><input type="checkbox" data-field="in_jellyfin"${jf ? ' checked' : ''}>MP4</label>
     </div>`;
