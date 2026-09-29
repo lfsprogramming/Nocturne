@@ -177,16 +177,21 @@ function radioValue(name) {
   return document.querySelector(`input[name="${name}"]:checked`).value;
 }
 
+// Lowercase + strip accents so "bjork" matches "Björk"; curly apostrophes match straight ones.
+function fold(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[‘’]/g, "'").toLowerCase();
+}
+
 function render() {
   const listEl = document.getElementById('media-list');
   const typeId = document.getElementById('type-select').value;
-  const search = document.getElementById('search-box').value.trim().toLowerCase();
+  const search = fold(document.getElementById('search-box').value.trim());
   const mkvFilter = radioValue('mkv-filter');
   const jfFilter = radioValue('jf-filter');
 
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
-  if (search) rows = rows.filter(r => r.title.toLowerCase().includes(search) || (r.creator || '').toLowerCase().includes(search));
+  if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
   if (mkvFilter) rows = rows.filter(r => !!r.has_mkv === (mkvFilter === 'true'));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
