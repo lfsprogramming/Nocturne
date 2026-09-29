@@ -289,7 +289,7 @@ function sortedVisible() {
   let rows = items.filter(i => showClosed || i.status === 'open' || recent.has(i.id));
   if (cat) rows = rows.filter(i => String(i.category_id) === cat);
   if (search) rows = rows.filter(i =>
-    [i.title, i.description, i.category && i.category.name].some(s => (s || '').toLowerCase().includes(search)));
+    [i.title, i.description, i.category && i.category.name].some(s => fold(s).includes(search)));
 
   const dl = i => (i.deadline ? new Date(i.deadline + 'T00:00:00').getTime() : null);
   const rv = i => (i.reviewed_on ? new Date(i.reviewed_on).getTime() : null);
@@ -310,8 +310,13 @@ function sortedVisible() {
   return rows;
 }
 
+// Lowercase + strip accents so "bjork" matches "Björk"; curly apostrophes match straight ones.
+function fold(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[‘’]/g, "'").toLowerCase();
+}
+
 function searchText() {
-  return document.getElementById('search-box').value.trim().toLowerCase();
+  return fold(document.getElementById('search-box').value.trim());
 }
 
 function rowHtml(i) {
