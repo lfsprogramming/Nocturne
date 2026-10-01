@@ -99,9 +99,11 @@
 
 .card.done { opacity: 0.55; }
 .c-done { color: var(--teal); margin-right: 0.4rem; }
-#reassess { border: 0.5px solid var(--gold-dim); background: var(--bg-card); padding: 0.7rem 0.9rem; margin-bottom: 0.9rem; }
-#reassess .manage-title { margin-bottom: 0.35rem; }
-#reassess-list { font-size: 15px; color: var(--text); line-height: 1.6; }
+.c-tally.overdue { color: #d0645c; }
+.c-due-when { color: var(--text-dim); }
+#reassess, #due { border: 0.5px solid var(--gold-dim); background: var(--bg-card); padding: 0.7rem 0.9rem; margin-bottom: 0.9rem; }
+#reassess .manage-title, #due .manage-title { margin-bottom: 0.35rem; }
+#reassess-list, #due-list { font-size: 15px; color: var(--text); line-height: 1.6; }
 .e-label { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 3px; }
 .e-countdown { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); }
 .card.light-bg .e-label, .card.light-bg .e-countdown { color: #3a3a46; }
@@ -164,6 +166,11 @@
       </div>
     </div>
 
+    <div id="due" hidden>
+      <div class="manage-title">maintenance due</div>
+      <div id="due-list"></div>
+    </div>
+
     <div id="reassess" hidden>
       <div class="manage-title">ready to reassess</div>
       <div id="reassess-list"></div>
@@ -182,7 +189,9 @@
 const UNDO_MS = 5000;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 // muted presets that keep the default light text readable on the dark theme
-const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since';
+const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since,interval_days';
+const DAY_MS = 86400000;
+const NOTE_MAX = 500;
 const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#45261f', '#3d1f2c', '#2e2e34'];
 
 let items = [];
@@ -195,6 +204,8 @@ const todayTotals = {};       // item id -> number logged today
 // logs from today, plus every log since the countdown started for items with a reassess gate:
 // { id, item_id, logged_at }. Drives the "done for today" check and the countdown.
 let gateLogs = [];
+// maintenance items (interval_days set): item id -> logged_at of the newest log, or null if never logged
+const lastDone = {};
 const recent = new Map();     // item id -> { stack: [{ logId, qty }], timer } — every tap within the undo window, newest last
 const busy = new Set();       // item ids with a click save in flight
 let editMode = false;
@@ -255,6 +266,51 @@ function daysLeft(i) {
 
 function isReadyToReassess(i) {
   return i.reassess_days != null && daysLeft(i) === 0;
+}
+
+/* ---------- maintenance (repeat every N days) ---------- */
+
+function isMaintenance(i) {
+  return i.interval_days != null;
+}
+
+function startOfLocalDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
+// whole calendar days until the next one is due (0 = due today, negative = overdue); null if never logged
+function maintDaysLeft(i) {
+  const last = lastDone[i.id];
+  if (!last) return null;
+  const since = Math.round((startOfLocalDay(new Date()) - startOfLocalDay(new Date(last))) / DAY_MS);
+  return i.interval_days - since;
+}
+
+function isDue(i) {
+  const left = maintDaysLeft(i);
+  return left === null || left <= 0;
+}
+
+function dueText(i) {
+  const left = maintDaysLeft(i);
+  if (left === null) return 'never logged';
+  if (left === 0) return 'due today';
+  if (left < 0) return `overdue ${-left} d`;
+  return `due in ${left} d`;
+}
+
+function shortDate(iso) {
+  const d = new Date(iso);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+async function loadLastDone(ids) {
+  if (!ids.length) return;
+  const rows = await NAuth.rest('clicker', 'logs?select=item_id,logged_at&order=logged_at.desc&item_id=in.(' + ids.join(',') + ')');
+  for (const id of ids) lastDone[id] = null;
+  for (const r of rows) if (!lastDone[r.item_id]) lastDone[r.item_id] = r.logged_at;
 }
 
 function qtypeName(id) {
@@ -319,6 +375,7 @@ function swatchesHtml(current) {
 
 function render() {
   renderBar();
+  renderDue();
   renderReassess();
   renderFilters();
   renderList();
@@ -344,6 +401,14 @@ function renderReassess() {
   document.getElementById('reassess-list').innerHTML = ready.map(i => escapeHtml(i.name)).join('<br>');
 }
 
+// shown regardless of the category filter, so a due item surfaces wherever you are
+function renderDue() {
+  const due = items.filter(i => !i.hidden && isMaintenance(i) && isDue(i));
+  document.getElementById('due').hidden = !due.length;
+  document.getElementById('due-list').innerHTML = due.map(i =>
+    `${escapeHtml(i.name)} <span class="c-due-when">— ${dueText(i)}</span>`).join('<br>');
+}
+
 function renderFilters() {
   const opts = [{ key: 'all', label: 'all' }, ...categories.map(c => ({ key: String(c.id), label: c.name }))];
   document.getElementById('filters').innerHTML = opts.map(o =>
@@ -357,6 +422,19 @@ function cardHtml(i) {
   const rec = recent.get(i.id);
   const undo = rec ? `<button class="c-undo" data-act="undo">undo${rec.stack.length > 1 ? ' ×' + rec.stack.length : ''}</button>` : '';
   const col = colorAttrs(i.color);
+
+  if (!editMode && isMaintenance(i)) {
+    const due = isDue(i);
+    const last = lastDone[i.id];
+    return `
+    <div class="card${col.cls}${due ? '' : ' done'}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log"${col.style}>
+      <div class="card-top">
+        <span class="c-name">${escapeHtml(i.name)}</span>
+        <span class="c-tally${due ? ' overdue' : ''}">${due ? '' : '<span class="c-done">✓</span>'}${dueText(i)}${undo}</span>
+      </div>
+      <div class="c-sub">${last ? 'last ' + shortDate(last) + ' · ' : ''}every ${i.interval_days} d</div>
+    </div>`;
+  }
 
   if (!editMode) {
     // what one tap is worth; skipped for a plain unitless 1, where it would only add noise
@@ -392,6 +470,8 @@ function cardHtml(i) {
           <label><span class="e-label">reassess after (days)</span>
             <input type="text" class="e-reassess" inputmode="numeric" placeholder="none" value="${i.reassess_days != null ? i.reassess_days : ''}"></label>
         </div>
+        <label><span class="e-label">repeat every (days) — maintenance; empty = normal item</span>
+          <input type="text" class="e-interval" inputmode="numeric" placeholder="none" value="${i.interval_days != null ? i.interval_days : ''}"></label>
         <div class="e-countdown">${countdownText(i)}</div>
         ${swatchesHtml(i.color)}
         <div class="edit-actions">
@@ -479,16 +559,24 @@ function fillQtypeSelect(sel) {
 async function logClick(id) {
   const item = items.find(i => i.id === id);
   if (!item || busy.has(id)) return;
+  let note = null;
+  if (isMaintenance(item)) {
+    // rare, record-worthy events: confirm the tap and offer a note (cancel = nothing logged)
+    const answer = window.prompt('log "' + item.name + '"?\noptional note (e.g. mileage, cost, who did it):', '');
+    if (answer === null) return;
+    note = answer.trim().slice(0, NOTE_MAX) || null;
+  }
   const qty = Number(item.quantity_per_click);
   todayTotals[id] = (todayTotals[id] || 0) + qty;
   busy.add(id);
   render();
   try {
     const rows = await NAuth.rest('clicker', 'logs?select=id,logged_at',
-      { method: 'POST', body: { item_id: id, quantity: qty, quantity_type_id: item.quantity_type_id }, prefer: 'return=representation' });
+      { method: 'POST', body: Object.assign({ item_id: id, quantity: qty, quantity_type_id: item.quantity_type_id }, note ? { note } : {}), prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
     const rec = recent.get(id) || { stack: [] };
-    rec.stack.push({ logId: rows[0].id, qty });
+    rec.stack.push({ logId: rows[0].id, qty, prevLast: lastDone[id] });
+    if (isMaintenance(item)) lastDone[id] = rows[0].logged_at;
     gateLogs.push({ id: rows[0].id, item_id: id, logged_at: rows[0].logged_at });
     armUndoTimer(id, rec);
     setStatus('✓ logged: ' + item.name, 'ok');
@@ -519,6 +607,7 @@ async function undoClick(id) {
     await NAuth.rest('clicker', 'logs?id=eq.' + encodeURIComponent(last.logId), { method: 'DELETE' });
     todayTotals[id] = Math.max(0, (todayTotals[id] || 0) - last.qty);
     gateLogs = gateLogs.filter(l => l.id !== last.logId);
+    if (id in lastDone) lastDone[id] = last.prevLast === undefined ? null : last.prevLast;
     rec.stack.pop();
     if (rec.stack.length) armUndoTimer(id, rec); else recent.delete(id);
     setStatus('✓ undone', 'ok');
@@ -554,6 +643,8 @@ async function saveItem(id, row) {
   const reassessRaw = row.querySelector('.e-reassess').value.trim();
   if (limitRaw && !/^[1-9]\d{0,2}$/.test(limitRaw)) { setEditMsg(row, 'daily minimum must be a whole number 1–999', 'err'); return; }
   if (reassessRaw && !/^[1-9]\d{0,2}$/.test(reassessRaw)) { setEditMsg(row, 'reassess days must be a whole number 1–999', 'err'); return; }
+  const intervalRaw = row.querySelector('.e-interval').value.trim();
+  if (intervalRaw && !(/^[1-9]\d{0,3}$/.test(intervalRaw) && Number(intervalRaw) <= 3650)) { setEditMsg(row, 'repeat days must be a whole number 1–3650', 'err'); return; }
   const body = {
     name,
     quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
@@ -562,6 +653,7 @@ async function saveItem(id, row) {
     category_id: catSel ? Number(catSel) : null,
     daily_limit: limitRaw ? Number(limitRaw) : null,
     reassess_days: reassessRaw ? Number(reassessRaw) : null,
+    interval_days: intervalRaw ? Number(intervalRaw) : null,
   };
   // touching the reassess field restarts the countdown even if the number is unchanged;
   // the server replaces this timestamp with its own clock (a quantity or daily limit change restarts it server-side too)
@@ -573,6 +665,7 @@ async function saveItem(id, row) {
       { method: 'PATCH', body, prefer: 'return=representation' });
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
     Object.assign(item, rows[0]);
+    if (isMaintenance(item) && !(id in lastDone)) await loadLastDone([id]);
     expandedEdit.delete(id);
     setStatus('✓ saved: ' + name, 'ok');
   } catch (e) {
@@ -857,6 +950,7 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
     }
     const logRows = await NAuth.rest('clicker', 'logs?select=id,item_id,quantity,logged_at&order=logged_at&or=' + encodeURIComponent('(' + conds.join(',') + ')'));
     gateLogs = logRows.map(l => ({ id: l.id, item_id: l.item_id, logged_at: l.logged_at }));
+    await loadLastDone(items.filter(isMaintenance).map(i => i.id));
     for (const l of logRows) {
       if (new Date(l.logged_at) >= new Date(todayIso)) todayTotals[l.item_id] = (todayTotals[l.item_id] || 0) + Number(l.quantity);
     }
