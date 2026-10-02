@@ -189,7 +189,7 @@
 const UNDO_MS = 5000;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 // muted presets that keep the default light text readable on the dark theme
-const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since,interval_days';
+const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since,interval_days,due_date,cycle_months';
 const DAY_MS = 86400000;
 const NOTE_MAX = 500;
 const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#45261f', '#3d1f2c', '#2e2e34'];
@@ -270,8 +270,24 @@ function isReadyToReassess(i) {
 
 /* ---------- maintenance (repeat every N days) ---------- */
 
+// two kinds: rolling (interval_days: next = last done + N days) and fixed deadline
+// (due_date + cycle_months, e.g. car registration; logging moves the date forward server-side)
 function isMaintenance(i) {
-  return i.interval_days != null;
+  return i.interval_days != null || i.due_date != null;
+}
+
+function isFixed(i) {
+  return i.due_date != null;
+}
+
+// a fixed deadline shows up in the due box this many days ahead, so it can still be met
+function leadDays(i) {
+  return i.cycle_months >= 3 ? 30 : 7;
+}
+
+function parseLocalDate(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
 }
 
 function startOfLocalDay(d) {
@@ -282,6 +298,7 @@ function startOfLocalDay(d) {
 
 // whole calendar days until the next one is due (0 = due today, negative = overdue); null if never logged
 function maintDaysLeft(i) {
+  if (isFixed(i)) return Math.round((parseLocalDate(i.due_date) - startOfLocalDay(new Date())) / DAY_MS);
   const last = lastDone[i.id];
   if (!last) return null;
   const since = Math.round((startOfLocalDay(new Date()) - startOfLocalDay(new Date(last))) / DAY_MS);
@@ -290,7 +307,19 @@ function maintDaysLeft(i) {
 
 function isDue(i) {
   const left = maintDaysLeft(i);
+  if (isFixed(i)) return left <= leadDays(i);
   return left === null || left <= 0;
+}
+
+function isLate(i) {
+  const left = maintDaysLeft(i);
+  return left === null || left <= 0;
+}
+
+async function refreshItem(id) {
+  const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id) + '&select=' + ITEM_COLS);
+  const item = items.find(i => i.id === id);
+  if (item && Array.isArray(rows) && rows.length === 1) Object.assign(item, rows[0]);
 }
 
 function dueText(i) {
@@ -430,9 +459,11 @@ function cardHtml(i) {
     <div class="card${col.cls}${due ? '' : ' done'}${busy.has(i.id) ? ' busy' : ''}" data-id="${i.id}" data-act="log"${col.style}>
       <div class="card-top">
         <span class="c-name">${escapeHtml(i.name)}</span>
-        <span class="c-tally${due ? ' overdue' : ''}">${due ? '' : '<span class="c-done">✓</span>'}${dueText(i)}${undo}</span>
+        <span class="c-tally${isLate(i) ? ' overdue' : ''}">${due ? '' : '<span class="c-done">✓</span>'}${dueText(i)}${undo}</span>
       </div>
-      <div class="c-sub">${last ? 'last ' + shortDate(last) + ' · ' : ''}every ${i.interval_days} d</div>
+      <div class="c-sub">${last ? 'last ' + shortDate(last) + ' · ' : ''}${isFixed(i)
+        ? `deadline ${escapeHtml(i.due_date)} · every ${i.cycle_months} mo`
+        : `every ${i.interval_days} d`}</div>
     </div>`;
   }
 
@@ -470,8 +501,14 @@ function cardHtml(i) {
           <label><span class="e-label">reassess after (days)</span>
             <input type="text" class="e-reassess" inputmode="numeric" placeholder="none" value="${i.reassess_days != null ? i.reassess_days : ''}"></label>
         </div>
-        <label><span class="e-label">repeat every (days) — maintenance; empty = normal item</span>
+        <label><span class="e-label">maintenance, rolling: repeat every (days) after last done</span>
           <input type="text" class="e-interval" inputmode="numeric" placeholder="none" value="${i.interval_days != null ? i.interval_days : ''}"></label>
+        <div class="field-row">
+          <label><span class="e-label">or fixed: next deadline</span>
+            <input type="date" class="e-due" value="${i.due_date ? escapeHtml(i.due_date) : ''}"></label>
+          <label><span class="e-label">every (months)</span>
+            <input type="text" class="e-cycle" inputmode="numeric" placeholder="none" value="${i.cycle_months != null ? i.cycle_months : ''}"></label>
+        </div>
         <div class="e-countdown">${countdownText(i)}</div>
         ${swatchesHtml(i.color)}
         <div class="edit-actions">
@@ -577,6 +614,7 @@ async function logClick(id) {
     const rec = recent.get(id) || { stack: [] };
     rec.stack.push({ logId: rows[0].id, qty, prevLast: lastDone[id] });
     if (isMaintenance(item)) lastDone[id] = rows[0].logged_at;
+    if (isFixed(item)) await refreshItem(id);
     gateLogs.push({ id: rows[0].id, item_id: id, logged_at: rows[0].logged_at });
     armUndoTimer(id, rec);
     setStatus('✓ logged: ' + item.name, 'ok');
@@ -608,6 +646,8 @@ async function undoClick(id) {
     todayTotals[id] = Math.max(0, (todayTotals[id] || 0) - last.qty);
     gateLogs = gateLogs.filter(l => l.id !== last.logId);
     if (id in lastDone) lastDone[id] = last.prevLast === undefined ? null : last.prevLast;
+    const undoneItem = items.find(i => i.id === id);
+    if (undoneItem && isFixed(undoneItem)) await refreshItem(id);
     rec.stack.pop();
     if (rec.stack.length) armUndoTimer(id, rec); else recent.delete(id);
     setStatus('✓ undone', 'ok');
@@ -645,6 +685,12 @@ async function saveItem(id, row) {
   if (reassessRaw && !/^[1-9]\d{0,2}$/.test(reassessRaw)) { setEditMsg(row, 'reassess days must be a whole number 1–999', 'err'); return; }
   const intervalRaw = row.querySelector('.e-interval').value.trim();
   if (intervalRaw && !(/^[1-9]\d{0,3}$/.test(intervalRaw) && Number(intervalRaw) <= 3650)) { setEditMsg(row, 'repeat days must be a whole number 1–3650', 'err'); return; }
+  const dueRaw = row.querySelector('.e-due').value.trim();
+  const cycleRaw = row.querySelector('.e-cycle').value.trim();
+  if (dueRaw && !/^\d{4}-\d{2}-\d{2}$/.test(dueRaw)) { setEditMsg(row, 'invalid deadline date', 'err'); return; }
+  if (cycleRaw && !(/^[1-9]\d{0,2}$/.test(cycleRaw) && Number(cycleRaw) <= 120)) { setEditMsg(row, 'months must be a whole number 1–120', 'err'); return; }
+  if (!dueRaw !== !cycleRaw) { setEditMsg(row, 'a fixed deadline needs both the date and the months', 'err'); return; }
+  if (dueRaw && intervalRaw) { setEditMsg(row, 'pick rolling days or a fixed deadline, not both', 'err'); return; }
   const body = {
     name,
     quantity_per_click: qtyRaw ? Number(qtyRaw) : 1,
@@ -654,6 +700,8 @@ async function saveItem(id, row) {
     daily_limit: limitRaw ? Number(limitRaw) : null,
     reassess_days: reassessRaw ? Number(reassessRaw) : null,
     interval_days: intervalRaw ? Number(intervalRaw) : null,
+    due_date: dueRaw || null,
+    cycle_months: cycleRaw ? Number(cycleRaw) : null,
   };
   // touching the reassess field restarts the countdown even if the number is unchanged;
   // the server replaces this timestamp with its own clock (a quantity or daily limit change restarts it server-side too)
