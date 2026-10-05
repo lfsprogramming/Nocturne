@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendar — Nocturne</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.mono { font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em; }
+#controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; }
+#item-sel {
+  flex: 1 1 220px; min-width: 0;
+  background: var(--bg-card); border: 0.5px solid var(--border); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 14px; padding: 8px 9px; color-scheme: dark;
+}
+#year-nav { display: flex; align-items: center; gap: 0.4rem; }
+#year-label { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--text); min-width: 3.2em; text-align: center; }
+.btn { white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; background: var(--bg-card); color: var(--gold); border: 0.5px solid var(--gold-dim); padding: 7px 12px; cursor: pointer; }
+.btn.on { color: var(--bg); background: var(--gold); }
+#views { display: flex; gap: 0.4rem; margin-bottom: 0.7rem; }
+#views .btn { flex: 1; padding: 7px 4px; font-size: 11px; }
+
+#range { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; font-size: 11px; color: var(--text-dim); }
+#range input {
+  width: 4.2em; background: var(--bg-card); border: 0.5px solid var(--border); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 14px; padding: 5px 6px; color-scheme: dark;
+}
+#legend { flex: 1; height: 10px; min-width: 60px; border: 0.5px solid var(--border); }
+
+#grid-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#grid {
+  display: grid;
+  grid-template-columns: 2.2em repeat(31, minmax(0, 1fr));
+  gap: 2px;
+}
+#grid.numbers { grid-template-columns: 2.2em repeat(31, minmax(22px, 1fr)); }
+.hd { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--text-dim); text-align: center; line-height: 1.4; }
+.mo { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim); display: flex; align-items: center; }
+.sq {
+  aspect-ratio: 1; min-width: 0;
+  background: #1a1a2a;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sq.none { background: transparent; cursor: default; }            /* Feb 30 and friends */
+.sq.nodata { background: transparent; outline: 0.5px solid var(--border); outline-offset: -0.5px; } /* future, or before the item existed */
+.sq.today { outline: 1px solid var(--gold); outline-offset: -1px; }
+.sq.sel { outline: 2px solid var(--text); outline-offset: -2px; }
+
+#detail { min-height: 3.2em; margin-top: 0.9rem; font-size: 12px; color: var(--text); line-height: 1.6; }
+#summary { font-size: 11px; color: var(--text-dim); margin-top: 0.4rem; }
+#msg { font-size: 12px; color: var(--text-dim); padding: 1rem 0; line-height: 1.7; }
+#msg.err { color: #d0645c; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+<script src="auth.js"></script>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <h1>Calendar</h1>
+    <p class="byline">a year of clicker taps — private, needs login</p>
+  </div>
+
+  <div id="msg" class="mono"></div>
+
+  <div id="wrap" hidden>
+    <div id="controls">
+      <select id="item-sel" aria-label="clicker item"></select>
+      <div id="year-nav">
+        <button class="btn" id="prev-year" aria-label="previous year">‹</button>
+        <span id="year-label"></span>
+        <button class="btn" id="next-year" aria-label="next year">›</button>
+      </div>
+    </div>
+
+    <div id="views">
+      <button class="btn" data-view="bool">on / off</button>
+      <button class="btn" data-view="grad">gradient</button>
+      <button class="btn" data-view="num">numbers</button>
+    </div>
+
+    <div id="range" class="mono" hidden>
+      <input type="number" id="r-min" inputmode="numeric" aria-label="bottom of range">
+      <div id="legend"></div>
+      <input type="number" id="r-max" inputmode="numeric" aria-label="top of range">
+    </div>
+
+    <div id="grid-scroll"><div id="grid"></div></div>
+    <div id="detail" class="mono"></div>
+    <div id="summary" class="mono"></div>
+  </div>
+</div>
+
+<footer>nocturne &mdash; built slowly, in the dark</footer>
+
+<script>
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COL_EMPTY = '#1a1a2a';      // on/off view: no taps
+const COL_ON = '#5dcaa5';         // on/off view: tapped (site teal)
+const GRAD_LO = [38, 38, 56];     // gradient bottom: dim grey, no red on purpose
+const GRAD_HI = [93, 202, 165];   // gradient top: site teal
+const DEFAULT_RANGE = [0, 5];
+const PAGE = 1000;                // PostgREST row cap per request
+
+let items = [];
+let itemId = null;
+let year = new Date().getFullYear();
+let view = 'bool';                // always starts on on/off; never remembered, so a phone never opens on numbers
+let counts = {};                  // 'YYYY-M-D' (local) -> number of taps
+let times = {};                   // same key -> array of Date
+let selKey = null;
+
+function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+
+function dayKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function daysIn(y, m) { return new Date(y, m + 1, 0).getDate(); }   // m is 0-based
+
+function setMsg(text, kind) {
+  const el = document.getElementById('msg');
+  el.innerHTML = text;
+  el.className = 'mono' + (kind ? ' ' + kind : '');
+}
+
+function getRange(id) {
+  const r = load('calendar.range.' + id);
+  return Array.isArray(r) && r.length === 2 ? r : DEFAULT_RANGE.slice();
+}
+
+function gradColor(n, lo, hi) {
+  let t = hi > lo ? (n - lo) / (hi - lo) : (n >= hi ? 1 : 0);
+  t = Math.max(0, Math.min(1, t));
+  const c = GRAD_LO.map((a, i) => Math.round(a + (GRAD_HI[i] - a) * t));
+  return { bg: `rgb(${c[0]},${c[1]},${c[2]})`, light: t > 0.55 };
+}
+
+/* ---------- data ---------- */
+
+let loadSeq = 0;                  // bumps on every load; a slower earlier load is ignored when it finishes
+
+async function loadYear() {
+  const seq = ++loadSeq;
+  // the year's bounds in local time, so evening taps land on the right local day
+  const from = new Date(year, 0, 1).toISOString();
+  const to = new Date(year + 1, 0, 1).toISOString();
+  const c = {}, t = {};
+  for (let offset = 0; ; offset += PAGE) {
+    const rows = await NAuth.rest('clicker',
+      `logs?select=logged_at&item_id=eq.${itemId}` +
+      `&logged_at=gte.${encodeURIComponent(from)}&logged_at=lt.${encodeURIComponent(to)}` +
+      `&order=logged_at&limit=${PAGE}&offset=${offset}`);
+    for (const r of rows) {
+      const d = new Date(r.logged_at);
+      const k = dayKey(d);
+      c[k] = (c[k] || 0) + 1;
+      (t[k] = t[k] || []).push(d);
+    }
+    if (rows.length < PAGE) break;
+  }
+  if (seq !== loadSeq) return false;
+  counts = c; times = t;
+  return true;
+}
+
+async function refresh() {
+  document.getElementById('year-label').textContent = year;
+  document.getElementById('grid').style.opacity = 0.4;
+  try {
+    if (!(await loadYear())) return;
+  } catch (e) {
+    if (e.code === 'auth') return needLogin('session expired.');
+    setMsg('failed to load: ' + e.message, 'err');
+    return;
+  }
+  setMsg('');
+  document.getElementById('grid').style.opacity = 1;
+  render();
+}
+
+/* ---------- render ---------- */
+
+function render() {
+  const item = items.find(i => i.id === itemId);
+  const created = item ? new Date(item.created_at) : null;
+  const createdDay = created ? new Date(created.getFullYear(), created.getMonth(), created.getDate()) : null;
+  const now = new Date();
+  const todayKey = dayKey(now);
+  const [lo, hi] = getRange(itemId);
+
+  document.querySelectorAll('#views .btn').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  document.getElementById('range').hidden = view !== 'grad';
+  document.getElementById('r-min').value = lo;
+  document.getElementById('r-max').value = hi;
+  document.getElementById('legend').style.background =
+    `linear-gradient(to right, ${gradColor(lo, lo, hi).bg}, ${gradColor(hi, lo, hi).bg})`;
+
+  const grid = document.getElementById('grid');
+  grid.classList.toggle('numbers', view === 'num');
+  let html = '<div></div>';
+  for (let d = 1; d <= 31; d++) html += `<div class="hd">${d}</div>`;
+
+  let tapped = 0, possible = 0;
+  for (let m = 0; m < 12; m++) {
+    html += `<div class="mo">${MONTHS[m]}</div>`;
+    const last = daysIn(year, m);
+    for (let d = 1; d <= 31; d++) {
+      if (d > last) { html += '<div class="sq none"></div>'; continue; }
+      const date = new Date(year, m, d);
+      const k = dayKey(date);
+      const n = counts[k] || 0;
+      const noData = date > now || (createdDay && date < createdDay && n === 0);
+      let cls = 'sq', style = '', text = '';
+      if (noData) {
+        cls += ' nodata';
+      } else {
+        possible++;
+        if (n > 0) tapped++;
+        if (view === 'bool') {
+          style = `background:${n > 0 ? COL_ON : COL_EMPTY}`;
+        } else if (view === 'grad') {
+          style = `background:${gradColor(n, lo, hi).bg}`;
+        } else {
+          const g = gradColor(n, lo, hi);
+          style = `background:${g.bg};color:${g.light ? '#08080f' : 'var(--text)'}`;
+          text = n;
+        }
+      }
+      if (k === todayKey) cls += ' today';
+      if (k === selKey) cls += ' sel';
+      html += `<div class="${cls}" data-k="${k}" style="${style}" title="${MONTHS[m]} ${d}: ${n}">${text}</div>`;
+    }
+  }
+  grid.innerHTML = html;
+
+  document.getElementById('summary').textContent = possible
+    ? `${tapped} of ${possible} days with at least one tap in ${year}`
+    : `no days to show in ${year}`;
+  renderDetail();
+}
+
+function renderDetail() {
+  const el = document.getElementById('detail');
+  if (!selKey) { el.textContent = 'tap a square for details'; el.style.color = 'var(--text-dim)'; return; }
+  const [y, m, d] = selKey.split('-').map(Number);
+  const n = counts[selKey] || 0;
+  const t = (times[selKey] || []).map(x => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+  el.style.color = 'var(--text)';
+  el.textContent = `${MONTHS[m - 1]} ${d}, ${y} — ${n} tap${n === 1 ? '' : 's'}` + (t.length ? ' · ' + t.join(', ') : '');
+}
+
+/* ---------- events ---------- */
+
+document.getElementById('grid').addEventListener('click', e => {
+  const sq = e.target.closest('.sq');
+  if (!sq || sq.classList.contains('none')) return;
+  selKey = sq.dataset.k === selKey ? null : sq.dataset.k;
+  render();
+});
+
+document.getElementById('views').addEventListener('click', e => {
+  if (!e.target.dataset.view) return;
+  view = e.target.dataset.view;
+  render();
+});
+
+function saveRange() {
+  const lo = Number(document.getElementById('r-min').value);
+  const hi = Number(document.getElementById('r-max').value);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi <= lo) return;  // ignore until it makes sense
+  store('calendar.range.' + itemId, [lo, hi]);
+  render();
+}
+document.getElementById('r-min').addEventListener('change', saveRange);
+document.getElementById('r-max').addEventListener('change', saveRange);
+
+document.getElementById('item-sel').addEventListener('change', e => {
+  itemId = Number(e.target.value);
+  store('calendar.item', itemId);
+  selKey = null;
+  refresh();
+});
+document.getElementById('prev-year').addEventListener('click', () => { year--; selKey = null; refresh(); });
+document.getElementById('next-year').addEventListener('click', () => { year++; selKey = null; refresh(); });
+
+/* ---------- start ---------- */
+
+function needLogin(why) {
+  document.getElementById('wrap').hidden = true;
+  setMsg((why ? why + ' ' : '') + 'sign in on the <a href="clicker.html">clicker page</a> first (same login), then come back here.');
+}
+
+(async function init() {
+  if (!NAuth.hasSession()) return needLogin('');
+  try { await NAuth.getToken(); } catch (e) { return needLogin('session expired.'); }
+  setMsg('loading…');
+  try {
+    items = await NAuth.rest('clicker', 'items?select=id,name,hidden,created_at&order=name');
+  } catch (e) {
+    if (e.code === 'auth') return needLogin('session expired.');
+    return setMsg('failed to load: ' + e.message, 'err');
+  }
+  if (!items.length) return setMsg('no clicker items yet.');
+
+  const opt = i => `<option value="${i.id}">${i.name.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}</option>`;
+  const shown = items.filter(i => !i.hidden), hidden = items.filter(i => i.hidden);
+  document.getElementById('item-sel').innerHTML =
+    shown.map(opt).join('') + (hidden.length ? `<optgroup label="hidden">${hidden.map(opt).join('')}</optgroup>` : '');
+
+  const saved = load('calendar.item');
+  itemId = items.some(i => i.id === saved) ? saved : (shown[0] || items[0]).id;
+  document.getElementById('item-sel').value = itemId;
+  document.getElementById('wrap').hidden = false;
+  refresh();
+})();
+</script>
+
+</body>
+</html>
