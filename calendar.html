@@ -48,6 +48,11 @@
 .sq.nodata { background: transparent; outline: 0.5px solid var(--border); outline-offset: -0.5px; } /* future, or before the item existed */
 .sq.today { outline: 1px solid var(--gold); outline-offset: -1px; }
 .sq.sel { outline: 2px solid var(--text); outline-offset: -2px; }
+.sq.wd { box-shadow: inset 0 0 0 1.5px var(--purple); }             /* ticked weekday; inset so it shows alongside today/selected */
+
+#weekdays { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; margin-bottom: 0.9rem; font-size: 12px; color: var(--text-dim); }
+#weekdays label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+#weekdays input { accent-color: var(--purple); width: 16px; height: 16px; }
 
 #detail { min-height: 3.2em; margin-top: 0.9rem; font-size: 12px; color: var(--text); line-height: 1.6; }
 #summary { font-size: 11px; color: var(--text-dim); margin-top: 0.4rem; }
@@ -85,6 +90,8 @@
       <button class="btn" data-view="num">numbers</button>
     </div>
 
+    <div id="weekdays" class="mono"></div>
+
     <div id="range" class="mono" hidden>
       <input type="number" id="r-min" inputmode="numeric" aria-label="bottom of range">
       <div id="legend"></div>
@@ -115,12 +122,15 @@ let view = 'bool';                // always starts on on/off; never remembered, 
 let counts = {};                  // 'YYYY-M-D' (local) -> number of taps
 let times = {};                   // same key -> array of Date
 let selKey = null;
+const WEEKDAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];   // index = Date.getDay()
 
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
 
 function dayKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
 function daysIn(y, m) { return new Date(y, m + 1, 0).getDate(); }   // m is 0-based
+
+let marked = new Set(load('calendar.weekdays') || []);    // ticked weekday indexes, remembered in this browser
 
 function setMsg(text, kind) {
   const el = document.getElementById('msg');
@@ -231,6 +241,7 @@ function render() {
           text = n;
         }
       }
+      if (marked.has(date.getDay())) cls += ' wd';
       if (k === todayKey) cls += ' today';
       if (k === selKey) cls += ' sel';
       html += `<div class="${cls}" data-k="${k}" style="${style}" title="${MONTHS[m]} ${d}: ${n}">${text}</div>`;
@@ -260,6 +271,15 @@ document.getElementById('grid').addEventListener('click', e => {
   const sq = e.target.closest('.sq');
   if (!sq || sq.classList.contains('none')) return;
   selKey = sq.dataset.k === selKey ? null : sq.dataset.k;
+  render();
+});
+
+document.getElementById('weekdays').innerHTML = WEEKDAYS.map((w, i) =>
+  `<label><input type="checkbox" data-wd="${i}"${marked.has(i) ? ' checked' : ''}>${w}</label>`).join('');
+document.getElementById('weekdays').addEventListener('change', e => {
+  const i = Number(e.target.dataset.wd);
+  if (e.target.checked) marked.add(i); else marked.delete(i);
+  store('calendar.weekdays', [...marked]);
   render();
 });
 
