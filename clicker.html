@@ -197,9 +197,7 @@ const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#
 let items = [];
 let qtypes = [];
 let categories = [];          // ordered by sort_order; items with no category count as "other"
-const FILTER_KEY = 'clicker.filter';
-let filter = 'all';           // 'all' or a category id (as a string)
-try { filter = localStorage.getItem(FILTER_KEY) || 'all'; } catch (e) {}
+let filter = 'all';           // 'all' or a category id (as a string); set to "core" on load
 const todayTotals = {};       // item id -> number logged today
 // logs from today, plus every log since the countdown started for items with a reassess gate:
 // { id, item_id, logged_at }. Drives the "done for today" check and the countdown.
@@ -894,7 +892,6 @@ document.getElementById('filters').addEventListener('click', e => {
   const key = e.target.dataset.filter;
   if (!key) return;
   filter = key;
-  try { localStorage.setItem(FILTER_KEY, key); } catch (err) {}
   render();
 });
 
@@ -988,7 +985,9 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
     ]);
     qtypes = qtypeRows;
     categories = catRows;
-    if (filter !== 'all' && !categories.some(c => String(c.id) === filter)) filter = 'all';
+    // every page load opens on "core"; falls back to "all" if that category is gone
+    const core = categories.find(c => c.name === 'core');
+    filter = core ? String(core.id) : 'all';
     items = itemRows;
     // all of today's logs, plus each gated item's own logs back to where its countdown started
     const todayIso = startOfTodayIso();
