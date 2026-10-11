@@ -189,7 +189,7 @@
 const UNDO_MS = 5000;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 // muted presets that keep the default light text readable on the dark theme
-const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since,interval_days,due_date,cycle_months';
+const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since,interval_days,due_date,cycle_months,sort_order';
 const DAY_MS = 86400000;
 const NOTE_MAX = 500;
 const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#45261f', '#3d1f2c', '#2e2e34'];
@@ -511,6 +511,8 @@ function cardHtml(i) {
         ${swatchesHtml(i.color)}
         <div class="edit-actions">
           <button class="btn" data-act="save">save</button>
+          <button class="btn" data-act="move" data-dir="-1" aria-label="move up">▲</button>
+          <button class="btn" data-act="move" data-dir="1" aria-label="move down">▼</button>
           <button class="btn hide-btn" data-act="hide">hide</button>
         </div>
         <div class="edit-msg"></div>
@@ -722,6 +724,37 @@ async function saveItem(id, row) {
   render();
 }
 
+// swap with the neighbour in the current view, then renumber every item 1..n so the
+// order is fully explicit; only rows whose number changed get written
+async function moveItem(id, dir) {
+  const visible = items.filter(i => !i.hidden && matchesFilter(i));
+  const pos = visible.findIndex(i => i.id === id);
+  const other = visible[pos + dir];
+  if (pos < 0 || !other || busy.size) return;
+  const order = items.slice();
+  const a = order.findIndex(i => i.id === id), b = order.findIndex(i => i.id === other.id);
+  [order[a], order[b]] = [order[b], order[a]];
+  const changed = order.map((i, n) => ({ item: i, n: n + 1 })).filter(x => x.item.sort_order !== x.n);
+  const prev = items;
+  items = order;
+  for (const x of changed) busy.add(x.item.id);
+  render();
+  try {
+    await Promise.all(changed.map(async x => {
+      const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(x.item.id),
+        { method: 'PATCH', body: { sort_order: x.n }, prefer: 'return=representation' });
+      if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+      x.item.sort_order = x.n;
+    }));
+  } catch (e) {
+    items = prev; // original order; anything already written shows up on the next reload
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); }
+    else setStatus('could not reorder: ' + e.message, 'err');
+  }
+  for (const x of changed) busy.delete(x.item.id);
+  render();
+}
+
 async function hideItem(id) {
   const item = items.find(i => i.id === id);
   if (!item || busy.has(id)) return;
@@ -910,6 +943,7 @@ listEl.addEventListener('click', e => {
   if (e.target.dataset.act === 'undo') { undoClick(id); return; }
   if (e.target.dataset.act === 'save') { saveItem(id, row); return; }
   if (e.target.dataset.act === 'hide') { hideItem(id); return; }
+  if (e.target.dataset.act === 'move') { moveItem(id, Number(e.target.dataset.dir)); return; }
   if (e.target.dataset.act === 'color') { applyRowColor(row, e.target.dataset.color); return; }
   if (e.target.dataset.act === 'save-qtype') {
     const nameInput = row.querySelector('.e-new-qtype');
@@ -981,7 +1015,7 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
     const [qtypeRows, catRows, itemRows] = await Promise.all([
       NAuth.rest('clicker', 'quantity_types?select=id,name&order=name'),
       NAuth.rest('clicker', 'categories?select=id,name&order=sort_order'),
-      NAuth.rest('clicker', 'items?select=' + ITEM_COLS + '&order=created_at'),
+      NAuth.rest('clicker', 'items?select=' + ITEM_COLS + '&order=sort_order.asc.nullslast,created_at'),
     ]);
     qtypes = qtypeRows;
     categories = catRows;
