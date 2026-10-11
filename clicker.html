@@ -103,6 +103,8 @@
 .c-due-when { color: var(--text-dim); }
 #reassess, #due { border: 0.5px solid var(--gold-dim); background: var(--bg-card); padding: 0.7rem 0.9rem; margin-bottom: 0.9rem; }
 #reassess .manage-title, #due .manage-title { margin-bottom: 0.35rem; }
+#reassess { border-color: var(--teal); cursor: pointer; }
+#reassess .manage-title { color: var(--teal); }
 #reassess-list, #due-list { font-size: 15px; color: var(--text); line-height: 1.6; }
 .e-label { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 3px; }
 .e-countdown { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); }
@@ -190,7 +192,7 @@
     </div>
 
     <div id="reassess" hidden>
-      <div class="manage-title">ready to reassess</div>
+      <div class="manage-title">ready to reassess — tap for goals</div>
       <div id="reassess-list"></div>
     </div>
 
@@ -1016,6 +1018,13 @@ document.getElementById('plus-btn').addEventListener('click', () => {
 
 document.getElementById('goals-btn').addEventListener('click', () => {
   goalsView = !goalsView;
+  goalEditing = null;
+  render();
+});
+
+// the "ready to reassess" box is a shortcut into the goals view
+document.getElementById('reassess').addEventListener('click', () => {
+  goalsView = true;
   goalEditing = null;
   render();
 });
