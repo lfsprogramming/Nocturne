@@ -108,6 +108,23 @@
 .e-countdown { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); }
 .card.light-bg .e-label, .card.light-bg .e-countdown { color: #3a3a46; }
 
+#goals > * + * { margin-top: 0.5rem; }
+.g-row { border: 0.5px solid var(--border); background: var(--bg-card); padding: 0.75rem 0.9rem; cursor: pointer; }
+.g-top { display: flex; align-items: baseline; gap: 0.6rem; }
+.g-name { flex: 1; min-width: 0; font-size: 16px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-target, .g-count { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--text-dim); white-space: nowrap; }
+.g-count.ready { color: var(--teal); }
+.g-bar { height: 4px; background: var(--bg); margin-top: 0.5rem; }
+.g-fill { height: 100%; background: var(--gold-dim); }
+.g-fill.ready { background: var(--teal); }
+.g-edit { margin-top: 0.7rem; cursor: default; }
+.g-edit > * + * { margin-top: 0.5rem; }
+.g-edit input, .g-edit select { width: 100%; background: var(--bg); border: 0.5px solid var(--border); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 15px; padding: 8px 9px; color-scheme: dark; }
+.g-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #d0645c; min-height: 1.2em; }
+#goals-none { margin-top: 1.2rem; }
+#goals-none-list { font-size: 15px; color: var(--text-dim); line-height: 1.9; }
+.g-none-name { cursor: pointer; }
+.g-none-name:hover, .g-none-name.sel { color: var(--gold); }
 #empty, #loading { padding: 1.5rem; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; line-height: 1.7; }
 [hidden] { display: none !important; }
 
@@ -142,6 +159,7 @@
     <div id="bar">
       <button class="btn" id="edit-toggle">edit</button>
       <button class="btn" id="plus-btn" hidden>+</button>
+      <button class="btn" id="goals-btn">goals</button>
       <span id="status"></span>
       <button id="signout">sign out</button>
     </div>
@@ -179,6 +197,15 @@
     <div id="filters"></div>
 
     <div id="list"></div>
+
+    <div id="goals" hidden>
+      <div id="goals-list"></div>
+      <div id="goals-none">
+        <div class="manage-title">no goal</div>
+        <div id="goals-none-list"></div>
+        <div id="goals-none-edit"></div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -189,7 +216,7 @@
 const UNDO_MS = 5000;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 // muted presets that keep the default light text readable on the dark theme
-const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,countdown_since,interval_days,due_date,cycle_months,sort_order';
+const ITEM_COLS = 'id,name,quantity_per_click,quantity_type_id,hidden,color,category_id,daily_limit,reassess_days,reassess_taps,countdown_since,interval_days,due_date,cycle_months,sort_order';
 const DAY_MS = 86400000;
 const NOTE_MAX = 500;
 const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#45261f', '#3d1f2c', '#2e2e34'];
@@ -210,6 +237,8 @@ let editMode = false;
 const expandedEdit = new Set(); // item ids showing their edit panel (edit mode only)
 let managePanelOpen = false;
 let addingItemOpen = false;
+let goalsView = false;
+let goalEditing = null;       // item id whose goal editor is open in the goals view
 
 function escapeHtml(s) {
   const div = document.createElement('div');
@@ -258,12 +287,30 @@ function fullDays(i) {
   return Object.values(perDay).filter(n => n >= need).length;
 }
 
+// taps logged since the countdown started (every tap counts, daily minimum or not)
+function tapsSince(i) {
+  const since = new Date(i.countdown_since).getTime();
+  return gateLogs.filter(l => l.item_id === i.id && new Date(l.logged_at).getTime() >= since).length;
+}
+
+// a goal is either N counted days or N taps; it only triggers a reassessment, never changes anything itself
+function hasGoal(i) {
+  return i.reassess_days != null || i.reassess_taps != null;
+}
+
+function goalProgress(i) {
+  if (i.reassess_days != null) return { done: Math.min(fullDays(i), i.reassess_days), target: i.reassess_days, unit: 'days' };
+  if (i.reassess_taps != null) return { done: Math.min(tapsSince(i), i.reassess_taps), target: i.reassess_taps, unit: 'taps' };
+  return null;
+}
+
 function daysLeft(i) {
-  return i.reassess_days == null ? null : Math.max(0, i.reassess_days - fullDays(i));
+  const g = goalProgress(i);
+  return g ? g.target - g.done : null;
 }
 
 function isReadyToReassess(i) {
-  return i.reassess_days != null && daysLeft(i) === 0;
+  return hasGoal(i) && daysLeft(i) === 0;
 }
 
 /* ---------- maintenance (repeat every N days) ---------- */
@@ -402,6 +449,9 @@ function swatchesHtml(current) {
 
 function render() {
   renderBar();
+  for (const id of ['due', 'reassess', 'filters', 'list']) document.getElementById(id).hidden = goalsView;
+  document.getElementById('goals').hidden = !goalsView;
+  if (goalsView) { renderGoals(); return; }
   renderDue();
   renderReassess();
   renderFilters();
@@ -414,6 +464,10 @@ function renderBar() {
   editBtn.textContent = editMode ? 'done' : 'edit';
   editBtn.className = 'btn' + (editMode ? ' on' : '');
   document.getElementById('plus-btn').hidden = !editMode;
+  editBtn.hidden = goalsView;
+  const goalsBtn = document.getElementById('goals-btn');
+  goalsBtn.textContent = goalsView ? '← clicker' : 'goals';
+  goalsBtn.hidden = editMode;
   if (!editMode) {
     managePanelOpen = false;
     document.getElementById('manage-panel').hidden = true;
@@ -434,6 +488,87 @@ function renderDue() {
   document.getElementById('due').hidden = !due.length;
   document.getElementById('due-list').innerHTML = due.map(i =>
     `${escapeHtml(i.name)} <span class="c-due-when">— ${dueText(i)}</span>`).join('<br>');
+}
+
+/* ---------- goals view ---------- */
+
+function goalEditorHtml(i) {
+  const unit = i.reassess_taps != null ? 'taps' : 'days';
+  const n = i.reassess_days != null ? i.reassess_days : (i.reassess_taps != null ? i.reassess_taps : '');
+  return `
+      <div class="g-edit" data-id="${i.id}">
+        <div class="field-row">
+          <input type="text" class="g-n" inputmode="numeric" placeholder="number" value="${n}">
+          <select class="g-unit" aria-label="goal type">
+            <option value="days"${unit === 'days' ? ' selected' : ''}>days</option>
+            <option value="taps"${unit === 'taps' ? ' selected' : ''}>taps</option>
+          </select>
+        </div>
+        <div class="edit-actions">
+          <button class="btn" data-act="g-save">${hasGoal(i) ? 'save & restart' : 'set goal'}</button>
+          ${hasGoal(i) ? '<button class="btn hide-btn" data-act="g-clear">clear goal</button>' : ''}
+          <button class="btn" data-act="g-cancel">cancel</button>
+        </div>
+        <div class="g-msg"></div>
+      </div>`;
+}
+
+// items with a goal, closest to done first; everything else in one line underneath
+function renderGoals() {
+  const pool = items.filter(i => !i.hidden && !isMaintenance(i));
+  const withGoal = pool.filter(hasGoal).map(i => ({ i, g: goalProgress(i) }))
+    .sort((a, b) => b.g.done / b.g.target - a.g.done / a.g.target);
+  document.getElementById('goals-list').innerHTML = withGoal.map(({ i, g }) => {
+    const ready = g.done >= g.target;
+    const pct = Math.round(100 * g.done / g.target);
+    return `
+    <div class="g-row" data-id="${i.id}">
+      <div class="g-top">
+        <span class="g-name">${escapeHtml(i.name)}</span>
+        <span class="g-target">${g.target} ${g.unit}</span>
+        <span class="g-count${ready ? ' ready' : ''}">${ready ? 'ready' : g.done + '/' + g.target}</span>
+      </div>
+      <div class="g-bar"><div class="g-fill${ready ? ' ready' : ''}" style="width:${pct}%"></div></div>
+      ${goalEditing === i.id ? goalEditorHtml(i) : ''}
+    </div>`;
+  }).join('') || '<div id="empty">no goals set yet.</div>';
+  const none = pool.filter(i => !hasGoal(i));
+  document.getElementById('goals-none').hidden = !none.length;
+  document.getElementById('goals-none-list').innerHTML = none.map(i =>
+    `<span class="g-none-name${goalEditing === i.id ? ' sel' : ''}" data-id="${i.id}">${escapeHtml(i.name)}</span>`).join(' · ');
+  const editingNone = none.find(i => i.id === goalEditing);
+  document.getElementById('goals-none-edit').innerHTML = editingNone ? goalEditorHtml(editingNone) : '';
+}
+
+// setting or changing a goal always restarts its count from now (the server stamps the time)
+async function saveGoal(id, box, clear) {
+  const item = items.find(i => i.id === id);
+  if (!item || busy.has(id)) return;
+  const msg = t => { box.querySelector('.g-msg').textContent = t; };
+  let body;
+  if (clear) body = { reassess_days: null, reassess_taps: null };
+  else {
+    const raw = box.querySelector('.g-n').value.trim();
+    if (!/^[1-9]\d{0,2}$/.test(raw)) { msg('a whole number 1–999'); return; }
+    const taps = box.querySelector('.g-unit').value === 'taps';
+    body = { reassess_days: taps ? null : Number(raw), reassess_taps: taps ? Number(raw) : null, countdown_since: new Date().toISOString() };
+  }
+  busy.add(id);
+  try {
+    const rows = await NAuth.rest('clicker', 'items?id=eq.' + encodeURIComponent(id) + '&select=' + ITEM_COLS,
+      { method: 'PATCH', body, prefer: 'return=representation' });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('not saved (no permission?)');
+    Object.assign(item, rows[0]);
+    goalEditing = null;
+    setStatus('✓ ' + (clear ? 'goal cleared: ' : 'goal set: ') + item.name, 'ok');
+  } catch (e) {
+    busy.delete(id);
+    if (e.code === 'auth') { showLogin('session expired — request a new link.', 'err'); return; }
+    msg('could not save: ' + e.message);
+    return;
+  }
+  busy.delete(id);
+  render();
 }
 
 function renderFilters() {
@@ -493,12 +628,8 @@ function cardHtml(i) {
           <input type="text" class="e-new-qtype" placeholder="new unit, e.g. rep" maxlength="40">
           <button class="btn" data-act="save-qtype">save unit</button>
         </div>
-        <div class="field-row">
-          <label><span class="e-label">daily minimum</span>
-            <input type="text" class="e-limit" inputmode="numeric" placeholder="none" value="${i.daily_limit != null ? i.daily_limit : ''}"></label>
-          <label><span class="e-label">reassess after (days)</span>
-            <input type="text" class="e-reassess" inputmode="numeric" placeholder="none" value="${i.reassess_days != null ? i.reassess_days : ''}"></label>
-        </div>
+        <label><span class="e-label">daily minimum</span>
+          <input type="text" class="e-limit" inputmode="numeric" placeholder="none" value="${i.daily_limit != null ? i.daily_limit : ''}"></label>
         <label><span class="e-label">maintenance, rolling: repeat every (days) after last done</span>
           <input type="text" class="e-interval" inputmode="numeric" placeholder="none" value="${i.interval_days != null ? i.interval_days : ''}"></label>
         <div class="field-row">
@@ -528,9 +659,9 @@ function cardHtml(i) {
 }
 
 function countdownText(i) {
-  if (i.reassess_days == null) return 'no reassess countdown';
-  const left = daysLeft(i);
-  return left === 0 ? 'ready to reassess' : `${left} day${left === 1 ? '' : 's'} left`;
+  const g = goalProgress(i);
+  if (!g) return 'no goal (set one in "goals")';
+  return g.done >= g.target ? 'goal: ready to reassess' : `goal: ${g.done}/${g.target} ${g.unit}`;
 }
 
 function qtypeOptions(selectedId) {
@@ -680,9 +811,7 @@ async function saveItem(id, row) {
   if (qtypeSel === '__new') { setEditMsg(row, 'save or clear the new unit first', 'err'); return; }
   if (qtyRaw && !/^\d{1,6}(\.\d+)?$/.test(qtyRaw)) { setEditMsg(row, 'quantity must be a number', 'err'); return; }
   const limitRaw = row.querySelector('.e-limit').value.trim();
-  const reassessRaw = row.querySelector('.e-reassess').value.trim();
   if (limitRaw && !/^[1-9]\d{0,2}$/.test(limitRaw)) { setEditMsg(row, 'daily minimum must be a whole number 1–999', 'err'); return; }
-  if (reassessRaw && !/^[1-9]\d{0,2}$/.test(reassessRaw)) { setEditMsg(row, 'reassess days must be a whole number 1–999', 'err'); return; }
   const intervalRaw = row.querySelector('.e-interval').value.trim();
   if (intervalRaw && !(/^[1-9]\d{0,3}$/.test(intervalRaw) && Number(intervalRaw) <= 3650)) { setEditMsg(row, 'repeat days must be a whole number 1–3650', 'err'); return; }
   const dueRaw = row.querySelector('.e-due').value.trim();
@@ -698,14 +827,10 @@ async function saveItem(id, row) {
     color,
     category_id: catSel ? Number(catSel) : null,
     daily_limit: limitRaw ? Number(limitRaw) : null,
-    reassess_days: reassessRaw ? Number(reassessRaw) : null,
     interval_days: intervalRaw ? Number(intervalRaw) : null,
     due_date: dueRaw || null,
     cycle_months: cycleRaw ? Number(cycleRaw) : null,
   };
-  // touching the reassess field restarts the countdown even if the number is unchanged;
-  // the server replaces this timestamp with its own clock (a quantity or daily limit change restarts it server-side too)
-  if (row.dataset.restart === '1') body.countdown_since = new Date().toISOString();
   busy.add(id);
   render();
   try {
@@ -889,6 +1014,29 @@ document.getElementById('plus-btn').addEventListener('click', () => {
   render();
 });
 
+document.getElementById('goals-btn').addEventListener('click', () => {
+  goalsView = !goalsView;
+  goalEditing = null;
+  render();
+});
+
+document.getElementById('goals').addEventListener('click', e => {
+  const act = e.target.dataset.act;
+  const box = e.target.closest('.g-edit');
+  if (box) {
+    const id = Number(box.dataset.id);
+    if (act === 'g-save') saveGoal(id, box, false);
+    else if (act === 'g-clear') saveGoal(id, box, true);
+    else if (act === 'g-cancel') { goalEditing = null; render(); }
+    return; // clicks inside the editor don't toggle it
+  }
+  const target = e.target.closest('.g-row, .g-none-name');
+  if (!target) return;
+  const id = Number(target.dataset.id);
+  goalEditing = goalEditing === id ? null : id;
+  render();
+});
+
 document.getElementById('add-item-toggle').addEventListener('click', () => {
   addingItemOpen = !addingItemOpen;
   if (addingItemOpen) { document.getElementById('f-cat').value = ''; renderManagePanel(); }
@@ -975,16 +1123,15 @@ listEl.addEventListener('change', e => {
   if (e.target.value === '__new') row.querySelector('.e-new-qtype').focus();
 });
 
-// editing the reassess field, or changing the quantity per click or daily limit, restarts the countdown on save — say so on the button
+// changing the quantity per click or daily limit restarts a goal's count server-side on save — say so on the button
 listEl.addEventListener('input', e => {
   const row = e.target.closest('.card');
-  if (e.target.classList.contains('e-reassess')) row.dataset.restart = '1';
-  if (e.target.matches('.e-reassess, .e-qty, .e-limit')) {
+  if (e.target.matches('.e-qty, .e-limit')) {
     const item = items.find(i => i.id === Number(row.dataset.id));
     const qtyChanged = row.querySelector('.e-qty').value.trim() !== String(Number(item.quantity_per_click));
     const limitChanged = row.querySelector('.e-limit').value.trim() !== (item.daily_limit != null ? String(item.daily_limit) : '');
     row.querySelector('[data-act="save"]').textContent =
-      row.dataset.restart === '1' || qtyChanged || limitChanged ? 'save & restart countdown' : 'save';
+      hasGoal(item) && (qtyChanged || limitChanged) ? 'save & restart countdown' : 'save';
     return;
   }
   if (!e.target.classList.contains('e-color-custom')) return;
@@ -1027,7 +1174,7 @@ document.getElementById('signout').addEventListener('click', () => { NAuth.signO
     const todayIso = startOfTodayIso();
     const conds = [`logged_at.gte."${todayIso}"`];
     for (const i of items) {
-      if (i.reassess_days != null) conds.push(`and(item_id.eq.${i.id},logged_at.gte."${new Date(i.countdown_since).toISOString()}")`);
+      if (hasGoal(i)) conds.push(`and(item_id.eq.${i.id},logged_at.gte."${new Date(i.countdown_since).toISOString()}")`);
     }
     const logRows = await NAuth.rest('clicker', 'logs?select=id,item_id,quantity,logged_at&order=logged_at&or=' + encodeURIComponent('(' + conds.join(',') + ')'));
     gateLogs = logRows.map(l => ({ id: l.id, item_id: l.item_id, logged_at: l.logged_at }));
