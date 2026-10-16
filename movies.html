@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Movies</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* Standalone read-only list for K: films whose file is in the Jellyfin movies/ folder.
+   Deliberately no nav.js, no footer, no links to the rest of the site. */
+#movies-wrap { max-width: 640px; margin: 0 auto; }
+#search-box {
+  width: 100%;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  margin-bottom: 1rem;
+}
+#search-box::placeholder { color: var(--text-faint); }
+#count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.8rem;
+}
+#movie-list { border: 0.5px solid var(--border); }
+.movie-row {
+  padding: 0.9rem 1.2rem;
+  border-bottom: 0.5px solid var(--border);
+}
+.movie-row:last-child { border-bottom: none; }
+.movie-row .m-title { color: var(--text); font-size: 17px; }
+.movie-row .m-creator { color: var(--text-dim); font-size: 14px; }
+#movies-empty, #movies-loading {
+  padding: 1.5rem;
+  color: var(--text-dim);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <div class="page-header">
+    <h1>Movies</h1>
+    <p class="byline">what's on the shelf</p>
+  </div>
+
+  <div id="movies-wrap">
+    <input type="text" id="search-box" placeholder="search titles or directors…">
+    <div id="count"></div>
+    <div id="movie-list"></div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://rthghgzdwqnlzvsoerhz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RvrKhg03c_vSx1wYwpSNFw_oRVuTVCQ';
+const FILM_TYPE_ID = 1;
+
+async function sbFetch(path) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Accept-Profile': 'media',
+    },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+let movies = [];
+
+// Lowercase + strip accents so "bjork" matches "Björk"; curly apostrophes match straight ones.
+function fold(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[‘’]/g, "'").toLowerCase();
+}
+
+// Sort like a shelf: ignore a leading "The", "A" or "An".
+function sortKey(title) {
+  return fold(title).replace(/^(the|a|an)\s+/, '');
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function render() {
+  const listEl = document.getElementById('movie-list');
+  const search = fold(document.getElementById('search-box').value.trim());
+  const rows = search
+    ? movies.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search))
+    : movies;
+
+  document.getElementById('count').textContent =
+    search ? `${rows.length} of ${movies.length} movies` : `${movies.length} movies`;
+
+  if (!rows.length) {
+    listEl.innerHTML = '<div id="movies-empty">nothing matches</div>';
+    return;
+  }
+  listEl.innerHTML = rows.map(r => `
+    <div class="movie-row">
+      <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById('search-box').addEventListener('input', render);
+
+(async function init() {
+  const listEl = document.getElementById('movie-list');
+  listEl.innerHTML = '<div id="movies-loading">loading…</div>';
+  try {
+    // in_jellyfin on a film = its file is in movies/ (xmovies/ is in_jellyfin_mature, not shown here)
+    movies = await sbFetch(`titles?select=title,creator&media_type_id=eq.${FILM_TYPE_ID}&in_jellyfin=is.true`);
+    movies.sort((a, b) => sortKey(a.title).localeCompare(sortKey(b.title)));
+    render();
+  } catch (err) {
+    listEl.innerHTML = `<div id="movies-empty">failed to load: ${escapeHtml(err.message)}</div>`;
+  }
+})();
+</script>
+
+</body>
+</html>
