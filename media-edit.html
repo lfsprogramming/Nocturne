@@ -193,7 +193,7 @@
 
   <div class="page-header">
     <h1>Media</h1>
-    <p class="byline">editing — interest score, MKV, MP4</p>
+    <p class="byline">editing — interest score, Jellyfin</p>
     <a id="back-link" href="media.html">← view</a>
   </div>
 
@@ -212,13 +212,7 @@
 
     <div id="filters">
       <fieldset class="filter-group">
-        <legend>MKV</legend>
-        <label><input type="radio" name="mkv-filter" value="" checked> off</label>
-        <label><input type="radio" name="mkv-filter" value="true"> true</label>
-        <label><input type="radio" name="mkv-filter" value="false"> false</label>
-      </fieldset>
-      <fieldset class="filter-group">
-        <legend>MP4 (Jellyfin)</legend>
+        <legend>Jellyfin</legend>
         <label><input type="radio" name="jf-filter" value="" checked> off</label>
         <label><input type="radio" name="jf-filter" value="true"> true</label>
         <label><input type="radio" name="jf-filter" value="false"> false</label>
@@ -240,8 +234,7 @@
         <input type="text" id="a-score" inputmode="decimal" placeholder="interest score" autocomplete="off">
       </div>
       <div class="field-row">
-        <label class="cell flag"><input type="checkbox" id="a-mkv">MKV</label>
-        <label class="cell flag"><input type="checkbox" id="a-jf">MP4 (Jellyfin)</label>
+        <label class="cell flag"><input type="checkbox" id="a-jf">Jellyfin</label>
       </div>
       <div id="add-msg"></div>
       <div class="form-buttons">
@@ -433,7 +426,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
 }
 
@@ -472,7 +465,6 @@ function resetAddForm() {
   document.getElementById('a-title').value = '';
   document.getElementById('a-score').value = '';
   document.getElementById('a-type').value = '';
-  document.getElementById('a-mkv').checked = false;
   document.getElementById('a-jf').checked = false;
   dupConfirmed = false;
   document.getElementById('add-title-btn').textContent = 'add';
@@ -499,7 +491,6 @@ async function addTitle() {
 
   const fields = {
     title: name,
-    has_mkv: document.getElementById('a-mkv').checked,
     in_jellyfin: document.getElementById('a-jf').checked,
   };
   if (parsed.value != null) fields.interest_score = parsed.value;
@@ -604,14 +595,12 @@ function render() {
   const listEl = document.getElementById('media-list');
   const typeId = document.getElementById('type-select').value;
   const search = fold(document.getElementById('search-box').value.trim());
-  const mkvFilter = radioValue('mkv-filter');
   const jfFilter = radioValue('jf-filter');
 
   // Filters look at the saved values, so a row doesn't vanish while you tick its box.
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
   if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
-  if (mkvFilter) rows = rows.filter(r => !!r.has_mkv === (mkvFilter === 'true'));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
   if (!rows.length) {
@@ -623,15 +612,13 @@ function render() {
     const id = String(r.id);
     const p = pending.get(id) || {};
     const score = effective(r, 'interest_score');
-    const mkv = effective(r, 'has_mkv');
     const jf = effective(r, 'in_jellyfin');
     return `
     <div class="media-row" data-id="${id}">
       <input class="cell score-in${'interest_score' in p ? ' changed' : ''}" data-field="interest_score"
              inputmode="decimal" placeholder="—" value="${score ?? ''}" aria-label="interest score">
       <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
-      <label class="cell flag${'has_mkv' in p ? ' changed' : ''}"><input type="checkbox" data-field="has_mkv"${mkv ? ' checked' : ''}>MKV</label>
-      <label class="cell flag${'in_jellyfin' in p ? ' changed' : ''}"><input type="checkbox" data-field="in_jellyfin"${jf ? ' checked' : ''}>MP4</label>
+      <label class="cell flag${'in_jellyfin' in p ? ' changed' : ''}"><input type="checkbox" data-field="in_jellyfin"${jf ? ' checked' : ''}>Jellyfin</label>
     </div>`;
   }).join('');
 }
@@ -728,7 +715,7 @@ async function saveEdits() {
 
 document.getElementById('type-select').addEventListener('change', render);
 document.getElementById('search-box').addEventListener('input', render);
-document.querySelectorAll('input[name="mkv-filter"], input[name="jf-filter"]')
+document.querySelectorAll('input[name="jf-filter"]')
   .forEach(el => el.addEventListener('change', render));
 
 const listEl = document.getElementById('media-list');

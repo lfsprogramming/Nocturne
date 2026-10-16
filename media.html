@@ -119,13 +119,7 @@
 
     <div id="filters">
       <fieldset class="filter-group">
-        <legend>MKV</legend>
-        <label><input type="radio" name="mkv-filter" value="" checked> off</label>
-        <label><input type="radio" name="mkv-filter" value="true"> true</label>
-        <label><input type="radio" name="mkv-filter" value="false"> false</label>
-      </fieldset>
-      <fieldset class="filter-group">
-        <legend>MP4 (Jellyfin)</legend>
+        <legend>Jellyfin</legend>
         <label><input type="radio" name="jf-filter" value="" checked> off</label>
         <label><input type="radio" name="jf-filter" value="true"> true</label>
         <label><input type="radio" name="jf-filter" value="false"> false</label>
@@ -170,7 +164,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,has_mkv,in_jellyfin&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast');
 }
 
 function radioValue(name) {
@@ -186,13 +180,11 @@ function render() {
   const listEl = document.getElementById('media-list');
   const typeId = document.getElementById('type-select').value;
   const search = fold(document.getElementById('search-box').value.trim());
-  const mkvFilter = radioValue('mkv-filter');
   const jfFilter = radioValue('jf-filter');
 
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
   if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
-  if (mkvFilter) rows = rows.filter(r => !!r.has_mkv === (mkvFilter === 'true'));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
   if (!rows.length) {
@@ -216,7 +208,7 @@ function escapeHtml(s) {
 
 document.getElementById('type-select').addEventListener('change', render);
 document.getElementById('search-box').addEventListener('input', render);
-document.querySelectorAll('input[name="mkv-filter"], input[name="jf-filter"]')
+document.querySelectorAll('input[name="jf-filter"]')
   .forEach(el => el.addEventListener('change', render));
 
 (async function init() {
