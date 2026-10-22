@@ -27,7 +27,8 @@
 .btn.on { color: var(--bg); background: var(--gold); }
 #plus-btn { font-size: 16px; line-height: 1; padding: 7px 14px; }
 
-#filters { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; }
+#filters { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.9rem; }
+#filters .f-row { display: flex; gap: 0.4rem; }
 #filters .btn { flex: 1; padding: 7px 4px; font-size: 11px; }
 
 #list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -226,7 +227,7 @@ const PRESET_COLORS = ['#2a1f3d', '#1f2f4a', '#1d3a3a', '#243a24', '#3d3520', '#
 let items = [];
 let qtypes = [];
 let categories = [];          // ordered by sort_order; items with no category count as "other"
-let filter = 'all';           // 'all' or a category id (as a string); set to "core" on load
+let filter = 'all';           // a category id (as a string), set to "core" on load; 'all' = fallback only, no button
 const todayTotals = {};       // item id -> number logged today
 // logs from today, plus every log since the countdown started for items with a reassess gate:
 // { id, item_id, logged_at }. Drives the "done for today" check and the countdown.
@@ -574,9 +575,14 @@ async function saveGoal(id, box, clear) {
 }
 
 function renderFilters() {
-  const opts = [{ key: 'all', label: 'all' }, ...categories.map(c => ({ key: String(c.id), label: c.name }))];
-  document.getElementById('filters').innerHTML = opts.map(o =>
-    `<button class="btn${o.key === filter ? ' on' : ''}" data-filter="${o.key}">${escapeHtml(o.label)}</button>`).join('');
+  // rows of 3 in sort_order: daily practices on the first line, occasional stuff on the second
+  const btns = categories.map(c => {
+    const key = String(c.id);
+    return `<button class="btn${key === filter ? ' on' : ''}" data-filter="${key}">${escapeHtml(c.name)}</button>`;
+  });
+  const rows = [];
+  for (let k = 0; k < btns.length; k += 3) rows.push(`<div class="f-row">${btns.slice(k, k + 3).join('')}</div>`);
+  document.getElementById('filters').innerHTML = rows.join('');
 }
 
 function cardHtml(i) {
