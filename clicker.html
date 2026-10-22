@@ -681,9 +681,30 @@ function qtypeOptions(selectedId) {
   return html;
 }
 
+// how neglected a rolling item is: days since last done / interval (1 = due today); never logged = most
+function neglect(i) {
+  if (i.interval_days == null) return -Infinity;
+  const last = lastDone[i.id];
+  if (!last) return Infinity;
+  const since = Math.round((startOfLocalDay(new Date()) - startOfLocalDay(new Date(last))) / DAY_MS);
+  return since / i.interval_days;
+}
+
+// connections view (not in edit mode, so ▲/▼ still shows the manual order): most neglected on top
+function isConnectionsView() {
+  const cat = categories.find(c => c.name === 'connections');
+  return !editMode && cat != null && String(cat.id) === filter;
+}
+
 function renderList() {
   const listEl = document.getElementById('list');
   const visible = items.filter(i => !i.hidden && matchesFilter(i));
+  if (isConnectionsView()) {
+    visible.sort((a, b) => {
+      const na = neglect(a), nb = neglect(b);
+      return na === nb ? 0 : (nb > na ? 1 : -1);
+    });
+  }
   if (!visible.length) {
     const cat = categories.find(c => String(c.id) === filter);
     listEl.innerHTML = cat
