@@ -193,7 +193,7 @@
 
   <div class="page-header">
     <h1>Media</h1>
-    <p class="byline">editing — interest score, Jellyfin</p>
+    <p class="byline">editing — interest score, Jellyfin, physical copy</p>
     <a id="back-link" href="media.html">← view</a>
   </div>
 
@@ -217,6 +217,12 @@
         <label><input type="radio" name="jf-filter" value="true"> true</label>
         <label><input type="radio" name="jf-filter" value="false"> false</label>
       </fieldset>
+      <fieldset class="filter-group">
+        <legend>Physical</legend>
+        <label><input type="radio" name="pc-filter" value="" checked> off</label>
+        <label><input type="radio" name="pc-filter" value="true"> true</label>
+        <label><input type="radio" name="pc-filter" value="false"> false</label>
+      </fieldset>
     </div>
 
     <div id="edit-bar">
@@ -235,6 +241,7 @@
       </div>
       <div class="field-row">
         <label class="cell flag"><input type="checkbox" id="a-jf">Jellyfin</label>
+        <label class="cell flag"><input type="checkbox" id="a-pc">Physical</label>
       </div>
       <div id="add-msg"></div>
       <div class="form-buttons">
@@ -426,7 +433,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy&order=interest_score.asc.nullslast');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
 }
 
@@ -466,6 +473,7 @@ function resetAddForm() {
   document.getElementById('a-score').value = '';
   document.getElementById('a-type').value = '';
   document.getElementById('a-jf').checked = false;
+  document.getElementById('a-pc').checked = false;
   dupConfirmed = false;
   document.getElementById('add-title-btn').textContent = 'add';
 }
@@ -492,6 +500,7 @@ async function addTitle() {
   const fields = {
     title: name,
     in_jellyfin: document.getElementById('a-jf').checked,
+    physical_copy: document.getElementById('a-pc').checked,
   };
   if (parsed.value != null) fields.interest_score = parsed.value;
   const typeId = document.getElementById('a-type').value;
@@ -596,12 +605,14 @@ function render() {
   const typeId = document.getElementById('type-select').value;
   const search = fold(document.getElementById('search-box').value.trim());
   const jfFilter = radioValue('jf-filter');
+  const pcFilter = radioValue('pc-filter');
 
   // Filters look at the saved values, so a row doesn't vanish while you tick its box.
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
   if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
+  if (pcFilter) rows = rows.filter(r => !!r.physical_copy === (pcFilter === 'true'));
 
   if (!rows.length) {
     listEl.innerHTML = '<div id="media-empty">nothing here yet</div>';
@@ -613,12 +624,14 @@ function render() {
     const p = pending.get(id) || {};
     const score = effective(r, 'interest_score');
     const jf = effective(r, 'in_jellyfin');
+    const pc = effective(r, 'physical_copy');
     return `
     <div class="media-row" data-id="${id}">
       <input class="cell score-in${'interest_score' in p ? ' changed' : ''}" data-field="interest_score"
              inputmode="decimal" placeholder="—" value="${score ?? ''}" aria-label="interest score">
       <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
       <label class="cell flag${'in_jellyfin' in p ? ' changed' : ''}"><input type="checkbox" data-field="in_jellyfin"${jf ? ' checked' : ''}>Jellyfin</label>
+      <label class="cell flag${'physical_copy' in p ? ' changed' : ''}"><input type="checkbox" data-field="physical_copy"${pc ? ' checked' : ''}>Physical</label>
     </div>`;
   }).join('');
 }
@@ -715,7 +728,7 @@ async function saveEdits() {
 
 document.getElementById('type-select').addEventListener('change', render);
 document.getElementById('search-box').addEventListener('input', render);
-document.querySelectorAll('input[name="jf-filter"]')
+document.querySelectorAll('input[name="jf-filter"], input[name="pc-filter"]')
   .forEach(el => el.addEventListener('change', render));
 
 const listEl = document.getElementById('media-list');
