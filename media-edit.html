@@ -433,7 +433,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy&order=interest_score.asc.nullslast,title.asc');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
 }
 

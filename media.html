@@ -164,7 +164,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast,title.asc');
 }
 
 function radioValue(name) {
