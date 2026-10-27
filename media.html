@@ -164,7 +164,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast,title.asc');
+  allTitles = await sbFetch('titles?select=id,title,platform,creator,interest_score,media_type_id,in_jellyfin&order=interest_score.asc.nullslast,title.asc');
 }
 
 function radioValue(name) {
@@ -184,7 +184,7 @@ function render() {
 
   let rows = allTitles;
   if (typeId) rows = rows.filter(r => String(r.media_type_id) === typeId);
-  if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
+  if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.platform).includes(search) || fold(r.creator).includes(search));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
 
   if (!rows.length) {
@@ -195,7 +195,7 @@ function render() {
   listEl.innerHTML = rows.map(r => `
     <div class="media-row">
       <span class="m-score">${r.interest_score ?? '—'}</span>
-      <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
+      <span class="m-title">${escapeHtml(r.title)}${r.platform ? ` (${escapeHtml(r.platform)})` : ''}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
     </div>
   `).join('');
 }
