@@ -127,6 +127,7 @@
 }
 .score-in { width: 3.6rem; }
 .score-in::placeholder { color: var(--text-faint); }
+.date-in { color-scheme: dark; width: 8.6rem; }
 .flag { cursor: pointer; white-space: nowrap; user-select: none; }
 .flag input { accent-color: var(--text); margin-right: 0.35rem; }   /* ticked = neutral; gold is reserved for "changed" */
 .cell.changed {
@@ -193,7 +194,7 @@
 
   <div class="page-header">
     <h1>Media</h1>
-    <p class="byline">editing — interest score, Jellyfin, physical copy</p>
+    <p class="byline">editing — interest score, Jellyfin, physical copy, rating, finished date</p>
     <a id="back-link" href="media.html">← view</a>
   </div>
 
@@ -223,6 +224,12 @@
         <label><input type="radio" name="pc-filter" value="true"> true</label>
         <label><input type="radio" name="pc-filter" value="false"> false</label>
       </fieldset>
+      <fieldset class="filter-group">
+        <legend>Finished</legend>
+        <label><input type="radio" name="fin-filter" value="" checked> off</label>
+        <label><input type="radio" name="fin-filter" value="true"> true</label>
+        <label><input type="radio" name="fin-filter" value="false"> false</label>
+      </fieldset>
     </div>
 
     <div id="edit-bar">
@@ -242,6 +249,10 @@
       <div class="field-row">
         <label class="cell flag"><input type="checkbox" id="a-jf">Jellyfin</label>
         <label class="cell flag"><input type="checkbox" id="a-pc">Physical</label>
+      </div>
+      <div class="field-row">
+        <input type="text" id="a-rating" inputmode="decimal" placeholder="rating (if finished)" autocomplete="off">
+        <input type="date" id="a-finished" aria-label="finished on">
       </div>
       <div id="add-msg"></div>
       <div class="form-buttons">
@@ -433,7 +444,7 @@ async function loadTypes() {
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy&order=interest_score.asc.nullslast,title.asc');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy,finished_on,rating&order=interest_score.asc.nullslast,title.asc');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
 }
 
@@ -474,6 +485,8 @@ function resetAddForm() {
   document.getElementById('a-type').value = '';
   document.getElementById('a-jf').checked = false;
   document.getElementById('a-pc').checked = false;
+  document.getElementById('a-rating').value = '';
+  document.getElementById('a-finished').value = '';
   dupConfirmed = false;
   document.getElementById('add-title-btn').textContent = 'add';
 }
@@ -486,6 +499,8 @@ async function addTitle() {
   if (!name) problems.push('title is required');
   const parsed = parseScore(scoreText);
   if (!parsed.ok) problems.push('interest score must be a number like 3 or 4.5');
+  const ratingParsed = parseScore(document.getElementById('a-rating').value);
+  if (!ratingParsed.ok) problems.push('rating must be a number like 1 or 1.8');
   if (problems.length) { setAddMsg(problems.join('; '), 'err'); return; }
 
   const dups = similarTitles(name);
@@ -503,6 +518,9 @@ async function addTitle() {
     physical_copy: document.getElementById('a-pc').checked,
   };
   if (parsed.value != null) fields.interest_score = parsed.value;
+  if (ratingParsed.value != null) fields.rating = ratingParsed.value;
+  const finished = document.getElementById('a-finished').value;
+  if (finished) fields.finished_on = finished;
   const typeId = document.getElementById('a-type').value;
   if (typeId) fields.media_type_id = Number(typeId);
 
@@ -529,7 +547,7 @@ async function addTitle() {
 /* ---------- edit state ---------- */
 
 const pending = new Map();   // id -> { field: newValue }
-const invalid = new Set();   // ids whose score box holds something unparseable
+const invalid = new Set();   // "id:field" for number boxes holding something unparseable
 let saving = false;
 
 function effective(r, field) {
@@ -580,7 +598,7 @@ function updateBar() {
   updateButtons();
   if (saving) return;
   const n = changeCount();
-  if (invalid.size) setStatus('a score is not a number — fix it or cancel', 'err');
+  if (invalid.size) setStatus('a score or rating is not a number — fix it or cancel', 'err');
   else if (n) setStatus(n + ' unsaved change' + (n === 1 ? '' : 's'), 'pending');
 }
 
@@ -606,6 +624,7 @@ function render() {
   const search = fold(document.getElementById('search-box').value.trim());
   const jfFilter = radioValue('jf-filter');
   const pcFilter = radioValue('pc-filter');
+  const finFilter = radioValue('fin-filter');
 
   // Filters look at the saved values, so a row doesn't vanish while you tick its box.
   let rows = allTitles;
@@ -613,6 +632,8 @@ function render() {
   if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
   if (pcFilter) rows = rows.filter(r => !!r.physical_copy === (pcFilter === 'true'));
+  // Finished = a finish date or a rating (old finishes often have a rating but no known date).
+  if (finFilter) rows = rows.filter(r => (r.finished_on != null || r.rating != null) === (finFilter === 'true'));
 
   if (!rows.length) {
     listEl.innerHTML = '<div id="media-empty">nothing here yet</div>';
@@ -625,6 +646,8 @@ function render() {
     const score = effective(r, 'interest_score');
     const jf = effective(r, 'in_jellyfin');
     const pc = effective(r, 'physical_copy');
+    const rating = effective(r, 'rating');
+    const fin = effective(r, 'finished_on');
     return `
     <div class="media-row" data-id="${id}">
       <input class="cell score-in${'interest_score' in p ? ' changed' : ''}" data-field="interest_score"
@@ -632,6 +655,10 @@ function render() {
       <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
       <label class="cell flag${'in_jellyfin' in p ? ' changed' : ''}"><input type="checkbox" data-field="in_jellyfin"${jf ? ' checked' : ''}>Jellyfin</label>
       <label class="cell flag${'physical_copy' in p ? ' changed' : ''}"><input type="checkbox" data-field="physical_copy"${pc ? ' checked' : ''}>Physical</label>
+      <input class="cell score-in${'rating' in p ? ' changed' : ''}" data-field="rating"
+             inputmode="decimal" placeholder="rating" value="${rating ?? ''}" aria-label="rating">
+      <input type="date" class="cell date-in${'finished_on' in p ? ' changed' : ''}" data-field="finished_on"
+             value="${fin ?? ''}" aria-label="finished on">
     </div>`;
   }).join('');
 }
@@ -648,15 +675,17 @@ function onCellEdit(e) {
   let value;
   if (el.type === 'checkbox') {
     value = el.checked;
+  } else if (el.type === 'date') {
+    value = el.value || null;   // the picker only ever yields '' or a valid YYYY-MM-DD
   } else {
     const parsed = parseScore(el.value);
     if (!parsed.ok) {
-      invalid.add(id);
+      invalid.add(id + ':' + field);
       cell.classList.add('invalid');
       updateBar();
       return;
     }
-    invalid.delete(id);
+    invalid.delete(id + ':' + field);
     cell.classList.remove('invalid');
     value = parsed.value;
   }
@@ -728,7 +757,7 @@ async function saveEdits() {
 
 document.getElementById('type-select').addEventListener('change', render);
 document.getElementById('search-box').addEventListener('input', render);
-document.querySelectorAll('input[name="jf-filter"], input[name="pc-filter"]')
+document.querySelectorAll('input[name="jf-filter"], input[name="pc-filter"], input[name="fin-filter"]')
   .forEach(el => el.addEventListener('change', render));
 
 const listEl = document.getElementById('media-list');
