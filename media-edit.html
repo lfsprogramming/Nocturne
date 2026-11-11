@@ -127,7 +127,6 @@
 }
 .score-in { width: 3.6rem; }
 .score-in::placeholder { color: var(--text-faint); }
-.date-in { color-scheme: dark; width: 8.6rem; }
 .flag { cursor: pointer; white-space: nowrap; user-select: none; }
 .flag input { accent-color: var(--text); margin-right: 0.35rem; }   /* ticked = neutral; gold is reserved for "changed" */
 .cell.changed {
@@ -166,6 +165,33 @@
 #add-msg.err { color: #d0645c; }
 #add-msg.ok { color: var(--teal); }
 
+/* log a finish */
+#finish-panel { border: 0.5px solid var(--border); background: var(--bg-card); padding: 0.9rem; margin-bottom: 0.8rem; }
+#finish-panel > * + * { margin-top: 0.6rem; }
+#finish-panel input[type="text"], #finish-panel input[type="date"], #finish-panel select {
+  width: 100%;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  padding: 9px 10px;
+  color-scheme: dark;
+}
+#finish-panel input::placeholder { color: var(--text-faint); }
+#f-results { max-height: 18rem; overflow-y: auto; border: 0.5px solid var(--border); }
+#f-results:empty { display: none; }
+.f-hit { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.45rem 0.7rem; border-bottom: 0.5px solid var(--border); cursor: pointer; color: var(--text); font-size: 15px; }
+.f-hit:last-child { border-bottom: none; }
+.f-hit input { accent-color: var(--gold); margin-top: 0.25rem; flex: none; }
+.f-hit .m-creator { color: var(--text-dim); font-size: 13px; }
+.f-note { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); padding: 0.45rem 0.7rem; }
+#f-selected, #f-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); line-height: 1.5; }
+#f-selected:empty, #f-msg:empty { display: none; }
+#f-selected button { font: inherit; color: var(--gold); background: none; border: none; cursor: pointer; padding: 0 0.3rem; }
+#f-msg.err { color: #d0645c; }
+#f-msg.ok { color: var(--teal); }
+
 /* login */
 #login { max-width: 420px; margin: 2rem auto; }
 #login p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; margin-bottom: 1rem; line-height: 1.7; }
@@ -194,7 +220,7 @@
 
   <div class="page-header">
     <h1>Media</h1>
-    <p class="byline">editing — interest score, Jellyfin, physical copy, rating, finished date</p>
+    <p class="byline">editing — interest score, Jellyfin, physical copy, finishes</p>
     <a id="back-link" href="media.html">← view</a>
   </div>
 
@@ -224,16 +250,11 @@
         <label><input type="radio" name="pc-filter" value="true"> true</label>
         <label><input type="radio" name="pc-filter" value="false"> false</label>
       </fieldset>
-      <fieldset class="filter-group">
-        <legend>Finished</legend>
-        <label><input type="radio" name="fin-filter" value="" checked> off</label>
-        <label><input type="radio" name="fin-filter" value="true"> true</label>
-        <label><input type="radio" name="fin-filter" value="false"> false</label>
-      </fieldset>
     </div>
 
     <div id="edit-bar">
       <button class="btn" id="add-toggle">+ add title</button>
+      <button class="btn" id="finish-toggle">+ log finish</button>
       <button class="btn" id="save-btn" disabled>save</button>
       <button class="btn" id="cancel-btn" disabled>cancel</button>
       <span id="status"></span>
@@ -250,14 +271,33 @@
         <label class="cell flag"><input type="checkbox" id="a-jf">Jellyfin</label>
         <label class="cell flag"><input type="checkbox" id="a-pc">Physical</label>
       </div>
-      <div class="field-row">
-        <input type="text" id="a-rating" inputmode="decimal" placeholder="rating (if finished)" autocomplete="off">
-        <input type="date" id="a-finished" aria-label="finished on">
-      </div>
       <div id="add-msg"></div>
       <div class="form-buttons">
         <button class="btn" id="add-title-btn">add</button>
         <button class="btn" id="add-close">close</button>
+      </div>
+    </div>
+
+    <div id="finish-panel" hidden>
+      <div class="field-row">
+        <select id="f-type" aria-label="type"><option value="">all types</option></select>
+        <input type="text" id="f-search" placeholder="search title…" autocomplete="off">
+      </div>
+      <div id="f-results"></div>
+      <div id="f-selected"></div>
+      <div class="field-row">
+        <input type="text" id="f-rating" inputmode="decimal" placeholder="rating (optional)" autocomplete="off">
+        <select id="f-with" aria-label="with">
+          <option value="">with…</option>
+          <option value="alone">alone</option>
+          <option value="K">K</option>
+        </select>
+      </div>
+      <input type="date" id="f-date" aria-label="finished on">
+      <div id="f-msg"></div>
+      <div class="form-buttons">
+        <button class="btn" id="f-log" disabled>log</button>
+        <button class="btn" id="f-close">close</button>
       </div>
     </div>
 
@@ -441,10 +481,12 @@ async function loadTypes() {
     select.appendChild(opt);
   }
   fillAddTypeSelect();
+  document.getElementById('f-type').innerHTML = '<option value="">all types</option>'
+    + mediaTypes.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
 }
 
 async function loadAllTitles() {
-  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy,finished_on,rating&order=interest_score.asc.nullslast,title.asc');
+  allTitles = await sbFetch('titles?select=id,title,creator,interest_score,media_type_id,in_jellyfin,physical_copy&order=interest_score.asc.nullslast,title.asc');
   byId = new Map(allTitles.map(r => [String(r.id), r]));
 }
 
@@ -485,8 +527,6 @@ function resetAddForm() {
   document.getElementById('a-type').value = '';
   document.getElementById('a-jf').checked = false;
   document.getElementById('a-pc').checked = false;
-  document.getElementById('a-rating').value = '';
-  document.getElementById('a-finished').value = '';
   dupConfirmed = false;
   document.getElementById('add-title-btn').textContent = 'add';
 }
@@ -499,8 +539,6 @@ async function addTitle() {
   if (!name) problems.push('title is required');
   const parsed = parseScore(scoreText);
   if (!parsed.ok) problems.push('interest score must be a number like 3 or 4.5');
-  const ratingParsed = parseScore(document.getElementById('a-rating').value);
-  if (!ratingParsed.ok) problems.push('rating must be a number like 1 or 1.8');
   if (problems.length) { setAddMsg(problems.join('; '), 'err'); return; }
 
   const dups = similarTitles(name);
@@ -518,9 +556,6 @@ async function addTitle() {
     physical_copy: document.getElementById('a-pc').checked,
   };
   if (parsed.value != null) fields.interest_score = parsed.value;
-  if (ratingParsed.value != null) fields.rating = ratingParsed.value;
-  const finished = document.getElementById('a-finished').value;
-  if (finished) fields.finished_on = finished;
   const typeId = document.getElementById('a-type').value;
   if (typeId) fields.media_type_id = Number(typeId);
 
@@ -542,6 +577,117 @@ async function addTitle() {
   }
   adding = false;
   document.getElementById('add-title-btn').disabled = false;
+}
+
+/* ---------- logging a finish (media.finishes: private, owner-only) ---------- */
+
+const FIN_SHOWN = 60;
+const finSelected = new Set();   // title ids (strings)
+let finSaving = false;
+
+function todayLocal() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function setFinMsg(text, kind) {
+  const el = document.getElementById('f-msg');
+  el.textContent = text;
+  el.className = kind || '';
+}
+
+// Matches are sorted by title, so a show's episodes come out in order (S01E01, S01E02, …).
+function finMatches() {
+  const q = fold(document.getElementById('f-search').value.trim());
+  if (!q) return [];
+  const typeId = document.getElementById('f-type').value;
+  return allTitles
+    .filter(r => (!typeId || String(r.media_type_id) === typeId) && (fold(r.title).includes(q) || fold(r.creator).includes(q)))
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
+}
+
+function renderFinish() {
+  const matches = finMatches();
+  const resEl = document.getElementById('f-results');
+  if (!document.getElementById('f-search').value.trim()) {
+    resEl.innerHTML = '';
+  } else if (!matches.length) {
+    resEl.innerHTML = '<div class="f-note">no matches</div>';
+  } else {
+    const shown = matches.slice(0, FIN_SHOWN);
+    const allTicked = shown.every(r => finSelected.has(String(r.id)));
+    resEl.innerHTML =
+      (shown.length > 1 ? `<div class="f-note"><button class="btn" id="f-all">${allTicked ? 'untick' : 'tick'} all ${shown.length} shown</button></div>` : '')
+      + shown.map(r => `
+      <label class="f-hit"><input type="checkbox" data-fid="${r.id}"${finSelected.has(String(r.id)) ? ' checked' : ''}>
+        <span>${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span></label>`).join('')
+      + (matches.length > FIN_SHOWN ? `<div class="f-note">+${matches.length - FIN_SHOWN} more — narrow the search</div>` : '');
+  }
+  renderFinSelected();
+}
+
+function renderFinSelected() {
+  const el = document.getElementById('f-selected');
+  const n = finSelected.size;
+  if (!n) { el.innerHTML = ''; }
+  else {
+    const names = [...finSelected].slice(0, 3).map(id => byId.get(id) ? byId.get(id).title : id);
+    el.innerHTML = `selected ${n}: ${escapeHtml(names.join(', '))}${n > 3 ? ', …' : ''}<button id="f-clear">clear</button>`;
+  }
+  document.getElementById('f-log').disabled = finSaving || n === 0;
+}
+
+async function insertFinishes(rows, token) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/finishes', {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + token,
+      'Content-Profile': 'media',
+      'Accept-Profile': 'media',
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); msg = j.message || j.msg || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  const saved = await res.json();
+  if (!Array.isArray(saved) || saved.length !== rows.length) throw new Error('not saved (no permission?)');
+}
+
+async function logFinish() {
+  if (finSaving || !finSelected.size) return;
+  const parsed = parseScore(document.getElementById('f-rating').value);
+  const withWhom = document.getElementById('f-with').value;
+  const problems = [];
+  if (!parsed.ok) problems.push('rating must be a number like 1 or 1.8');
+  if (!withWhom) problems.push('pick alone or K');
+  if (problems.length) { setFinMsg(problems.join('; '), 'err'); return; }
+
+  const date = document.getElementById('f-date').value || null;   // blank = date unknown
+  const ids = [...finSelected];
+  const rows = ids.map(id => ({ title_id: Number(id), finished_on: date, with_whom: withWhom, rating: parsed.value }));
+
+  finSaving = true;
+  renderFinSelected();
+  setFinMsg('logging…');
+  try {
+    const token = await getToken();
+    await insertFinishes(rows, token);
+    const first = byId.get(ids[0]) ? byId.get(ids[0]).title : '';
+    setFinMsg('✓ logged ' + (ids.length === 1 ? first : ids.length + ' titles (' + first + ', …)'), 'ok');
+    finSelected.clear();
+    document.getElementById('f-search').value = '';
+    document.getElementById('f-rating').value = '';
+  } catch (e) {
+    setFinMsg('could not log: ' + e.message, 'err');
+  }
+  finSaving = false;
+  renderFinish();
 }
 
 /* ---------- edit state ---------- */
@@ -598,7 +744,7 @@ function updateBar() {
   updateButtons();
   if (saving) return;
   const n = changeCount();
-  if (invalid.size) setStatus('a score or rating is not a number — fix it or cancel', 'err');
+  if (invalid.size) setStatus('a score is not a number — fix it or cancel', 'err');
   else if (n) setStatus(n + ' unsaved change' + (n === 1 ? '' : 's'), 'pending');
 }
 
@@ -624,7 +770,6 @@ function render() {
   const search = fold(document.getElementById('search-box').value.trim());
   const jfFilter = radioValue('jf-filter');
   const pcFilter = radioValue('pc-filter');
-  const finFilter = radioValue('fin-filter');
 
   // Filters look at the saved values, so a row doesn't vanish while you tick its box.
   let rows = allTitles;
@@ -632,8 +777,6 @@ function render() {
   if (search) rows = rows.filter(r => fold(r.title).includes(search) || fold(r.creator).includes(search));
   if (jfFilter) rows = rows.filter(r => !!r.in_jellyfin === (jfFilter === 'true'));
   if (pcFilter) rows = rows.filter(r => !!r.physical_copy === (pcFilter === 'true'));
-  // Finished = a finish date or a rating (old finishes often have a rating but no known date).
-  if (finFilter) rows = rows.filter(r => (r.finished_on != null || r.rating != null) === (finFilter === 'true'));
 
   if (!rows.length) {
     listEl.innerHTML = '<div id="media-empty">nothing here yet</div>';
@@ -646,8 +789,6 @@ function render() {
     const score = effective(r, 'interest_score');
     const jf = effective(r, 'in_jellyfin');
     const pc = effective(r, 'physical_copy');
-    const rating = effective(r, 'rating');
-    const fin = effective(r, 'finished_on');
     return `
     <div class="media-row" data-id="${id}">
       <input class="cell score-in${'interest_score' in p ? ' changed' : ''}" data-field="interest_score"
@@ -655,10 +796,6 @@ function render() {
       <span class="m-title">${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span>
       <label class="cell flag${'in_jellyfin' in p ? ' changed' : ''}"><input type="checkbox" data-field="in_jellyfin"${jf ? ' checked' : ''}>Jellyfin</label>
       <label class="cell flag${'physical_copy' in p ? ' changed' : ''}"><input type="checkbox" data-field="physical_copy"${pc ? ' checked' : ''}>Physical</label>
-      <input class="cell score-in${'rating' in p ? ' changed' : ''}" data-field="rating"
-             inputmode="decimal" placeholder="rating" value="${rating ?? ''}" aria-label="rating">
-      <input type="date" class="cell date-in${'finished_on' in p ? ' changed' : ''}" data-field="finished_on"
-             value="${fin ?? ''}" aria-label="finished on">
     </div>`;
   }).join('');
 }
@@ -675,8 +812,6 @@ function onCellEdit(e) {
   let value;
   if (el.type === 'checkbox') {
     value = el.checked;
-  } else if (el.type === 'date') {
-    value = el.value || null;   // the picker only ever yields '' or a valid YYYY-MM-DD
   } else {
     const parsed = parseScore(el.value);
     if (!parsed.ok) {
@@ -757,7 +892,7 @@ async function saveEdits() {
 
 document.getElementById('type-select').addEventListener('change', render);
 document.getElementById('search-box').addEventListener('input', render);
-document.querySelectorAll('input[name="jf-filter"], input[name="pc-filter"], input[name="fin-filter"]')
+document.querySelectorAll('input[name="jf-filter"], input[name="pc-filter"]')
   .forEach(el => el.addEventListener('change', render));
 
 const listEl = document.getElementById('media-list');
@@ -774,6 +909,36 @@ document.getElementById('add-toggle').addEventListener('click', () => {
 });
 document.getElementById('add-close').addEventListener('click', () => { document.getElementById('add-panel').hidden = true; });
 document.getElementById('add-title-btn').addEventListener('click', addTitle);
+
+document.getElementById('finish-toggle').addEventListener('click', () => {
+  const panel = document.getElementById('finish-panel');
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) {
+    if (!document.getElementById('f-date').value) document.getElementById('f-date').value = todayLocal();
+    document.getElementById('f-search').focus();
+  }
+});
+document.getElementById('f-close').addEventListener('click', () => { document.getElementById('finish-panel').hidden = true; });
+document.getElementById('f-type').addEventListener('change', renderFinish);
+document.getElementById('f-search').addEventListener('input', () => { setFinMsg(''); renderFinish(); });
+document.getElementById('f-results').addEventListener('change', e => {
+  const id = e.target.dataset && e.target.dataset.fid;
+  if (!id) return;
+  if (e.target.checked) finSelected.add(id); else finSelected.delete(id);
+  renderFinish();
+});
+document.getElementById('f-results').addEventListener('click', e => {
+  if (e.target.id !== 'f-all') return;
+  e.preventDefault();
+  const shown = finMatches().slice(0, FIN_SHOWN).map(r => String(r.id));
+  const allTicked = shown.every(id => finSelected.has(id));
+  shown.forEach(id => allTicked ? finSelected.delete(id) : finSelected.add(id));
+  renderFinish();
+});
+document.getElementById('f-selected').addEventListener('click', e => {
+  if (e.target.id === 'f-clear') { finSelected.clear(); renderFinish(); }
+});
+document.getElementById('f-log').addEventListener('click', logFinish);
 document.getElementById('a-title').addEventListener('input', () => {
   dupConfirmed = false;
   document.getElementById('add-title-btn').textContent = 'add';
