@@ -185,6 +185,7 @@
 .f-hit:last-child { border-bottom: none; }
 .f-hit input { accent-color: var(--gold); margin-top: 0.25rem; flex: none; }
 .f-hit .m-creator { color: var(--text-dim); font-size: 13px; }
+.f-marks { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--teal); margin-top: 0.15rem; }
 .f-note { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); padding: 0.45rem 0.7rem; }
 #f-selected, #f-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim); line-height: 1.5; }
 #f-selected:empty, #f-msg:empty { display: none; }
@@ -582,8 +583,35 @@ async function addTitle() {
 /* ---------- logging a finish (media.finishes: private, owner-only) ---------- */
 
 const FIN_SHOWN = 60;
+const FIN_MARKS = 3;             // finishes shown per title before "+N more"
 const finSelected = new Set();   // title ids (strings)
 let finSaving = false;
+let finishesByTitle = new Map(); // title id (string) -> finishes, newest first (undated last)
+
+// Finishes are private (owner-only RLS), so this read goes out as the signed-in user, not the public key.
+async function loadFinishes() {
+  const token = await getToken();
+  const res = await fetch(SUPABASE_URL + '/rest/v1/finishes?select=id,title_id,finished_on,with_whom,rating&order=finished_on.desc.nullslast,id.desc', {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Accept-Profile': 'media' },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  finishesByTitle = new Map();
+  for (const f of rows) {
+    const k = String(f.title_id);
+    if (!finishesByTitle.has(k)) finishesByTitle.set(k, []);
+    finishesByTitle.get(k).push(f);
+  }
+}
+
+function finMarks(id) {
+  const list = finishesByTitle.get(String(id));
+  if (!list || !list.length) return '';
+  const parts = list.slice(0, FIN_MARKS).map(f =>
+    `${f.with_whom} ${f.finished_on || '?'}${f.rating != null ? ` (${f.rating})` : ''}`);
+  const more = list.length > FIN_MARKS ? ` · +${list.length - FIN_MARKS} more` : '';
+  return `<span class="f-marks">✓ ${escapeHtml(parts.join(' · '))}${more}</span>`;
+}
 
 function todayLocal() {
   const d = new Date();
@@ -620,7 +648,7 @@ function renderFinish() {
       (shown.length > 1 ? `<div class="f-note"><button class="btn" id="f-all">${allTicked ? 'untick' : 'tick'} all ${shown.length} shown</button></div>` : '')
       + shown.map(r => `
       <label class="f-hit"><input type="checkbox" data-fid="${r.id}"${finSelected.has(String(r.id)) ? ' checked' : ''}>
-        <span>${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}</span></label>`).join('')
+        <span>${escapeHtml(r.title)}${r.creator ? `<span class="m-creator"> — ${escapeHtml(r.creator)}</span>` : ''}${finMarks(r.id)}</span></label>`).join('')
       + (matches.length > FIN_SHOWN ? `<div class="f-note">+${matches.length - FIN_SHOWN} more — narrow the search</div>` : '');
   }
   renderFinSelected();
@@ -683,6 +711,7 @@ async function logFinish() {
     finSelected.clear();
     document.getElementById('f-search').value = '';
     document.getElementById('f-rating').value = '';
+    try { await loadFinishes(); } catch (e) { setFinMsg('logged, but could not reload history: ' + e.message, 'err'); }
   } catch (e) {
     setFinMsg('could not log: ' + e.message, 'err');
   }
@@ -970,6 +999,8 @@ window.addEventListener('beforeunload', e => {
     await loadTypes();
     await loadAllTitles();
     render();
+    // History marks are a nice-to-have: if they fail to load, the page (and logging) still works.
+    loadFinishes().then(renderFinish).catch(e => setFinMsg('could not load finish history: ' + e.message, 'err'));
   } catch (err) {
     listEl.innerHTML = `<div id="media-empty">failed to load: ${escapeHtml(err.message)}</div>`;
   }
